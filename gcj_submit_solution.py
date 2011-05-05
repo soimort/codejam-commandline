@@ -147,9 +147,9 @@ def main():
     # Get the needed middleware tokens to submit solutions and check for running
     # attempts.
     try:
-      submit_output_token = middleware_tokens['SubmitAnswer']
-      download_input_token = middleware_tokens['GetInputFile']
+      get_initial_values_token = middleware_tokens['GetInitialValues']
       user_status_token = middleware_tokens['GetUserStatus']
+      submit_output_token = middleware_tokens['SubmitAnswer']
     except KeyError as e:
       raise error.ConfigurationError(
           'Cannot find {0} token in configuration file. Reinitializing the '
@@ -241,26 +241,42 @@ def main():
     if not cookie or options.renew_cookie:
       cookie = code_jam_login.Login(options.password)
 
-    # Get the status for this problem input and check if there is a running
-    # timer for it.
+    # Get the contest status and check if it is accepting submissions.
+    contest_status = contest_manager.GetContestStatus(
+        host, cookie, get_initial_values_token, contest_id)
+    if not options.force and not contest_manager.CanSubmit(contest_status):
+      raise error.UserError('Cannot submit solutions to this contest, its not '
+                            'active or in practice mode.\n')
+
+    # All problem inputs have public answers in practice mode.
+    input_public = (input_spec[input_type]['public'] or
+                    contest_status == contest_manager.PRACTICE)
+
+    # Get the user status and check if it is participating or not.
     input_index = utils.GetIndexFromInputId(input_spec, input_id)
     current_user_status = user_status.GetUserStatus(
         host, cookie, user_status_token, contest_id, input_spec)
-    problem_inputs = current_user_status.problem_inputs
-    problem_input_state = problem_inputs[problem_index][input_index]
-    if not options.force and problem_input_state.current_attempt == -1:
-      raise error.UserError(
-          'You cannot submit {0}-{1}, the timer expired or you did not '
-          'download this input.\n'.format(problem_letter, input_type))
+    if (contest_status == contest_manager.ACTIVE and
+        current_user_status is not None):
+      # Check that there is a running timer for this problem input.
+      problem_inputs = current_user_status.problem_inputs
+      problem_input_state = problem_inputs[problem_index][input_index]
+      if not options.force and problem_input_state.current_attempt == -1:
+        raise error.UserError(
+            'You cannot submit {0}-{1}, the timer expired or you did not '
+            'download this input.\n'.format(problem_letter, input_type))
 
-    # Ask for confirmation if user is trying to resubmit a non-public output.
-    input_public = input_spec[input_type]['public']
-    if not input_public and problem_input_state.submitted:
-      submit_message = ('You already have submitted an output for {0}-{1}. '
-                        'Resubmitting will override the previous one.'.format(
-                            problem_letter, input_type))
-      utils.AskConfirmationOrDie(submit_message, 'Submit', options.force)
-      print 'Submitting new output and source files.'
+      # Ask for confirmation if user is trying to resubmit a non-public output.
+      if not input_public and problem_input_state.submitted:
+        submit_message = ('You already have submitted an output for {0}-{1}. '
+                          'Resubmitting will override the previous one.'.format(
+                              problem_letter, input_type))
+        utils.AskConfirmationOrDie(submit_message, 'Submit', options.force)
+        print 'Submitting new output and source files.'
+      else:
+        print 'Submitting output and source files.'
+    else:
+      print 'Submitting practice output and source files.'
 
     # Create the output submitter and send the files.
     submitter = output_submitter.OutputSubmitter(

@@ -25,12 +25,15 @@ import json
 import os
 import shutil
 import sys
+import time
 
 from lib import code_jam_login
 from lib import constants
 from lib import data_manager
 from lib import error
 from lib import http_interface
+
+PLANNED, ACTIVE, QUIET, FINISHED, PRACTICE = range(0, 5)
 
 
 def _GetProblems(host, cookie, contest_id):
@@ -58,7 +61,7 @@ def _GetProblems(host, cookie, contest_id):
       host, contest_id)
   request_arguments = {
       'cmd': 'GetProblems',
-      'contest': contest_id
+      'contest': contest_id,
       }
   request_headers = {
       'Referer': request_referer,
@@ -105,6 +108,8 @@ def _ValidateContestDataOrRaise(middleware_tokens, problems):
     error.ConfigurationError: If the contest data is invalid or incomplete.
   """
   needed_tokens = {
+      'GetInitialValues': ('Cannot find middleware token to get contest '
+                           'status.\n'),
       'GetInputFile': ('Cannot find middleware token to get input files, '
                        'please login again.\n'),
       'GetUserStatus': ('Cannot find middleware token to get user status, '
@@ -225,3 +230,73 @@ def ClearContest():
   except OSError as e:
     raise error.InternalError('OS error happened while deleting file "{0}": '
                               '{1}.\n'.format(filename, e))
+
+
+def GetContestStatus(host, cookie, get_initial_values_token, contest_id):
+  """Get the contest status of the specified contest.
+
+  Args:
+    host: Host where the contest is running.
+    cookie: Cookie that the user received when authenticating.
+    get_initial_values_token: Middleware token used to make the request.
+    contest_id: ID of the contest whose problems must be read.
+
+  Returns:
+    The contest status.
+
+  Raises:
+    error.NetworkError: If a network error occurs while communicating with the
+      server.
+    error.ServerError: If the server answers code distinct than 200 or the
+      response is a malformed JSON.
+  """
+  # Send an HTTP request to get the problem list from the server.
+  sys.stdout.write('Getting status of contest {0} from "{1}"...\n'.format(
+      contest_id, host))
+  request_referer = 'http://{0}/codejam/contest/dashboard?c={1}'.format(
+      host, contest_id)
+  request_arguments = {
+      'cmd': 'GetInitialValues',
+      'contest': contest_id,
+      'zx': str(int(time.time())),
+      'csrfmiddlewaretoken': str(get_initial_values_token),
+      }
+  request_headers = {
+      'Referer': request_referer,
+      'Cookie': cookie,
+      }
+  try:
+    status, reason, response = http_interface.Get(
+        host, '/codejam/contest/dashboard/do', request_arguments,
+        request_headers)
+  except httplib.HTTPException as e:
+    raise error.NetworkError('HTTP exception while retrieving contest status '
+                             'from the Google Code Jam server: '
+                             '{0}.\n'.format(e))
+
+  # Check if the status is not good.
+  if status != 200 or reason != 'OK':
+    raise error.ServerError('Error while communicating with the server, cannot '
+                            'get contest status. Check that the host, username '
+                            'and contest id are valid.\n')
+
+  # Parse the JSON response and extract the contest status from it.
+  try:
+    json_response = json.loads(response)
+    return json_response['cs']
+  except (KeyError, ValueError) as e:
+    raise error.ServerError('Invalid response received from the server, cannot '
+                            'get contest status. Check that the contest id is '
+                            'valid: {0}.\n'.format(e))
+
+
+def CanSubmit(contest_status):
+  """Check if a contest is accepting submissions given its status.
+
+  Args:
+    contest_status: Status of the contest to check.
+
+  Returns:
+    True if the contest is accepting and processing submissions.
+  """
+  return contest_status in [ACTIVE, PRACTICE]

@@ -144,7 +144,7 @@ def _GetMiddlewareTokens(host, cookie):
   request_referer = 'http://{0}/codejam'.format(host)
   request_arguments = {
       'cmd': 'GetMiddlewareTokens',
-      'actions': 'GetInputFile,GetUserStatus,SubmitAnswer',
+      'actions': 'GetInitialValues,GetInputFile,GetUserStatus,SubmitAnswer',
       }
   request_headers = {
       'Referer': request_referer,

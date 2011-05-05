@@ -82,12 +82,20 @@ class UserStatus(object):
           the type of inputs per problem.
 
     Returns:
-      An UserStatus object with the information contained in the json_response.
+      An UserStatus object with the information contained in the json_response,
+      or None if the user is not participating/did not participate in this
+      contest.
 
     Raises:
       error.ServerError: If there is a key missing from the server response.
     """
     try:
+      # Extract the rank and check if the user is participating or participated
+      # in this contest.
+      rank = json_response['rank']
+      if rank == -1:
+        return None
+
       # Extract problem information from the response and create problem input
       # status objects for each problem.
       json_attempts = json_response['a']
@@ -112,7 +120,6 @@ class UserStatus(object):
 
       # Extract the user status and clusterize the problem inputs. Then return
       # an user status object with the extracted information.
-      rank = json_response['rank']
       points = json_response['pts']
       problem_inputs = _ClusterByGroups(plain_problem_inputs, len(input_spec))
       return UserStatus(rank, points, problem_inputs)
@@ -145,7 +152,7 @@ def GetUserStatus(host, cookie, middleware_token, contest_id, input_spec):
       response is a malformed JSON.
   """
   # Send an HTTP request to get the user status.
-  sys.stdout.write('Getting status at contest {0} from "{1}"...\n'.format(
+  sys.stdout.write('Getting user status at contest {0} from "{1}"...\n'.format(
       contest_id, host))
   request_referer = 'http://{0}/codejam/contest/dashboard?c={1}'.format(
       host, contest_id)

@@ -1,4 +1,4 @@
-GCJ Commandline submit tool, v1.0 beta3
+GCJ Commandline submit tool, v1.0-beta2
 Copyright 2010 Google Inc. All Rights Reserved.
 
 Download and submit tool for the Google Code Jam
@@ -24,7 +24,7 @@ TABLE OF CONTENTS:
 -------------------------------------------------------------------------------
 0. DISCLAIMER
 
-GCJ Commandline submit tool, v1.0 beta3
+GCJ Commandline submit tool, v1.0-beta2
 Copyright 2010 Google Inc. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
@@ -155,10 +155,14 @@ before submitting it.
 After submitting the file, the Code Jam server will answer with a message
 string. The most important values are:
 
-- 'Wrong Answer': Your solution for the small input was wrong, try again.
-- 'Good Job!': Your solution for the small input was right, congratulations!
-- 'Your answer has been received and will be judged at the end of the contest.':
-  This is received after submitting the output for a large input.
+- 'Incorrect: Wrong Answer': Your solution for the small input was wrong, try
+  again.
+- 'Correct: Good Job!': Your solution for the small input was right,
+  congratulations!
+- 'Submitted: Your answer has been received and will be judged at the end of
+  the contest.': This is received after submitting the output for a large input.
+- 'Rejected: <reason>': Your submission was rejected for some reason, please
+  try again. This attempt did not count as a wrong answer.
 
 
 2e. Cleaning the contest

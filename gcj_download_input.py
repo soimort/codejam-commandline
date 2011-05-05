@@ -121,6 +121,7 @@ def main():
     # Get the needed middleware tokens to request the file and check for running
     # attempts.
     try:
+      get_initial_values_token = middleware_tokens['GetInitialValues']
       download_input_token = middleware_tokens['GetInputFile']
       user_status_token = middleware_tokens['GetUserStatus']
     except KeyError as e:
@@ -179,42 +180,56 @@ def main():
     if not cookie or options.renew_cookie:
       cookie = code_jam_login.Login(options.password)
 
-    # Get the status for this problem input and check if it can be downloaded or
-    # not. An input can be downloaded as long as it has not been solved yet; a
-    # non-public input also cannot have wrong tries.
+    # Get the contest status and check if it is accepting submissions.
+    contest_status = contest_manager.GetContestStatus(
+        host, cookie, get_initial_values_token, contest_id)
+    if not options.force and not contest_manager.CanSubmit(contest_status):
+      raise error.UserError('Cannot download inputs from this contest, its not '
+                            'active or in practice mode.\n')
+
+    # Get the user status and check if it is participating or not.
     input_index = utils.GetIndexFromInputId(input_spec, input_id)
     current_user_status = user_status.GetUserStatus(
         host, cookie, user_status_token, contest_id, input_spec)
-    problem_inputs = current_user_status.problem_inputs
-    problem_input_state = problem_inputs[problem_index][input_index]
-    input_public = input_spec[input_type]['public']
-    can_download = problem_input_state.solved_time == -1
-    if not input_public:
-      can_download = can_download and problem_input_state.wrong_tries == 0
-    if not options.force and not can_download:
-      raise error.UserError(
-          'You cannot download {0}-{1}, it is already {2}.\n'.format(
-              problem_letter, input_type,
-              'solved' if input_public else 'submitted and the timer expired'))
+    if (contest_status == contest_manager.ACTIVE and
+        current_user_status is not None):
+      # Check if this problem input can be downloaded or not. An input can be
+      # downloaded as long as it has not been solved yet; a non-public input
+      # also cannot have wrong tries.
+      problem_inputs = current_user_status.problem_inputs
+      problem_input_state = problem_inputs[problem_index][input_index]
+      input_public = input_spec[input_type]['public']
+      can_download = problem_input_state.solved_time == -1
+      if not input_public:
+        can_download = can_download and problem_input_state.wrong_tries == 0
+      if not options.force and not can_download:
+        raise error.UserError(
+            'You cannot download {0}-{1}, it is already {2}.\n'.format(
+                problem_letter, input_type,
+                'solved' if input_public else ('submitted and the timer '
+                                               'expired')))
 
-    # Check if there is a pending attempt for this problem input. If there is no
-    # pending attempt, show warning indicating that a new timer has started.
-    if problem_input_state.current_attempt == -1:
-      # Show a warning message to the user indicating that a new input is being
-      # downloaded, including the time available to solve it.
-      remaining_time = input_spec[input_type]['time_limit']
-      download_message = ('You will have {0} to submit your answer for '
-                          '{1}-{2}.'.format(utils.FormatHumanTime(
-                              remaining_time), problem_letter, input_type))
-      utils.AskConfirmationOrDie(download_message, 'Download', options.force)
-      print 'Downloading new input file.'
+      # Check if there is a pending attempt for this problem input. If there is
+      # no pending attempt, show warning indicating that a new timer has
+      # started.
+      if problem_input_state.current_attempt == -1:
+        # Show a warning message to the user indicating that a new input is
+        # being downloaded, including the time available to solve it.
+        remaining_time = input_spec[input_type]['time_limit']
+        download_message = ('You will have {0} to submit your answer for '
+                            '{1}-{2}.'.format(utils.FormatHumanTime(
+                                remaining_time), problem_letter, input_type))
+        utils.AskConfirmationOrDie(download_message, 'Download', options.force)
+        print 'Downloading new input file.'
+      else:
+        # Show a message to the user indicating that the same input file is
+        # being downloaded, including the time left to solve it.
+        remaining_time = problem_input_state.current_attempt
+        print ('You still have {0} to submit your answer for {1}-{2}.'.format(
+            utils.FormatHumanTime(remaining_time), problem_letter, input_type))
+        print 'Redownloading previous input file.'
     else:
-      # Show a message to the user indicating that the same input file is being
-      # downloaded, including the time left to solve it.
-      remaining_time = problem_input_state.current_attempt
-      print ('You still have {0} to submit your answer for {1}-{2}.'.format(
-          utils.FormatHumanTime(remaining_time), problem_letter, input_type))
-      print 'Redownloading previous input file.'
+      print 'Downloading practice input file.'
 
     # Create the input downloader and request the file.
     downloader = input_downloader.InputDownloader(
