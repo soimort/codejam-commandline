@@ -43,15 +43,24 @@ def main():
     parser.add_option('-p', '--passwd', action='store', dest='password',
                       help=('Password used to login in the server, will be '
                             'asked if not specified'))
+    parser.add_option('--base_dir', action='store', dest='base_dir',
+                      help=('Base directory used to parametrize configuration '
+                            'file paths'))
+    parser.set_defaults(base_dir=os.path.dirname(__file__))
     options, args = parser.parse_args()
 
-    # Check that the number of arguments is valid.
-    if len(args) != 1:
-      raise error.OptionError('need 1 positional arguments')
+    # Store the script location in a runtime constant, so it can be used by
+    # the library to locate the configuration files.
+    constants.SetRuntimeConstant('base_dir', options.base_dir)
 
-    # Extract the contest id and initialize the contest.
-    contest_id = args[0]
-    contest_manager.Initialize(contest_id, options.password)
+    # Check that the number of arguments is valid.
+    if len(args) > 1:
+      raise error.OptionError('need 0 or 1 positional arguments')
+
+    # Extract the contest id from the arguments or use None to initialize for
+    # the current contest.
+    contest_id = args[0] if len(args) == 1 else None
+    contest_manager.Initialize(-1, contest_id, options.password)
 
   except error.OptionError as e:
     parser.print_usage()

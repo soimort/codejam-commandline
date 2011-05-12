@@ -58,34 +58,38 @@ class MultipartData(object):
     guessed_type = mimetypes.guess_type(filename)[0]
     return guessed_type if guessed_type != None else 'application/octet-stream'
 
-  def AddFile(self, name, filename):
+  def AddFile(self, name, filename, file_data=None):
     """Add a file's contents to this multipart data.
 
     Args:
       name: Name of the element to add to the multipart data.
       filename: Name of the file with the contents to add to the multipart data.
+      file_data: Data of the file to be added. If None, the data will be read
+          from this file instead. This parameter is here to support
+          memory-mapped files.
 
     Raises:
       error.InternalError: If a problem occurs when reading the file.
     """
-    try:
-      # Read the data from the specified file.
-      file = open(filename, 'rb')
-      file_data = file.read()
-      file.close()
+    # Read the data from the specified file.
+    if file_data is None:
+      try:
+        file_obj = open(filename, 'rb')
+        file_data = file_obj.read()
+        file_obj.close()
+      except IOError as e:
+        raise error.InternalError('I/O error while reading file "{0}": '
+                                  '{1}.\n'.format(filename, e))
 
-      # Append the metadata and then the read file data. Finally, complete with
-      # a closing boundary.
-      self.data.append('--' + self.boundary)
-      self.data.append('Content-Disposition: form-data; name="{0}"; '
-                       'filename="{1}"'.format(name, filename))
-      self.data.append('Content-Type: {0}'.format(
-          self._GetContentType(filename)))
-      self.data.append('')
-      self.data.append(file_data)
-    except IOError as e:
-      raise error.InternalError('I/O error while reading file "{0}": '
-                                '{1}.\n'.format(filename, e))
+    # Append the metadata and then the read file data. Finally, complete with
+    # a closing boundary.
+    self.data.append('--' + self.boundary)
+    self.data.append('Content-Disposition: form-data; name="{0}"; '
+                     'filename="{1}"'.format(name, filename))
+    self.data.append('Content-Type: {0}'.format(
+        self._GetContentType(filename)))
+    self.data.append('')
+    self.data.append(file_data)
 
   def AddString(self, name, value):
     """Add a string value to this multipart data.

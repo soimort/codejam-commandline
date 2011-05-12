@@ -1,4 +1,16 @@
 -------------------------------------------------------------------------------
+GCJ Command Line v1.0-beta3, released 2011-05-10
+
+[Feature]: Add support to parametrize configuration file paths with the base
+           directories. Use --base_dir option to override auto-detection.
+
+[Feature]: Init contest script now autodetects the current contest if no contest
+           id is specified in the arguments.
+
+[Fix]: Use memory-mapped files to compress and decompress network traffic and
+       source files, no need for temporary files.
+
+-------------------------------------------------------------------------------
 GCJ Command Line v1.0-beta2, released 2011-05-05
 
 [Feature]: Added support for practice contests.

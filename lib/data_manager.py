@@ -111,9 +111,10 @@ def _ValidateData(data):
     raise error.ConfigurationError('Username was not found in user data '
                                    'file.\n')
   if data['user'] == 'your-name-here@gmail.com':
+    user_config_path = ParametrizeConfigPath(constants.USER_CONFIG_PATH)
     raise error.ConfigurationError('Remember to set your username in the user '
                                    'configuration file "{0}".\n'.format(
-                                       constants.USER_CONFIG_FILE))
+                                       user_config_path))
 
   # All input type names should not contain only lowercase letters and digits.
   if 'input_spec' not in data:
@@ -125,6 +126,19 @@ def _ValidateData(data):
                                      'is invalid, it should contain only '
                                      'lowercase letters and digits.\n'.format(
                                          input_name))
+
+
+def ParametrizeConfigPath(config_path):
+  """Fill in arguments in the config_path and return the result.
+
+  Args:
+    config_path: Path to be parametrized.
+
+  Returns:
+    The config_path with the arguments filled.
+  """
+  base_dir = constants.GetRuntimeConstant('base_dir', '.')
+  return config_path.format(base_dir=base_dir)
 
 
 def ReadData(default_data=None):
@@ -143,13 +157,15 @@ def ReadData(default_data=None):
   """
   # Read the user data and check if it was read successfully.
   try:
-    user_data = _ReadDataImpl(constants.USER_CONFIG_FILE)
+    user_config_path = ParametrizeConfigPath(constants.USER_CONFIG_PATH)
+    user_data = _ReadDataImpl(user_config_path)
   except error.InternalError:
     raise error.InternalError('Unable to read used data.\n')
 
   # Read the current contest data and show warning if not read successfully.
   try:
-    current_data = _ReadDataImpl(constants.CURRENT_CONFIG_FILE)
+    current_config_path = ParametrizeConfigPath(constants.CURRENT_CONFIG_PATH)
+    current_data = _ReadDataImpl(current_config_path)
   except error.InternalError:
     sys.stderr.write('Warning: Cannot read current data.\n')
     current_data = {}
@@ -177,7 +193,8 @@ def WriteData(data):
   # Just forward the data to the current configuration file, the user
   # configuration should not be changed by the tool.
   try:
-    _WriteDataImpl(data, constants.CURRENT_CONFIG_FILE)
+    current_config_path = ParametrizeConfigPath(constants.CURRENT_CONFIG_PATH)
+    _WriteDataImpl(data, current_config_path)
   except error.InternalError:
     raise error.InternalError('Cannot write data to the current '
                               'configuration.\n')

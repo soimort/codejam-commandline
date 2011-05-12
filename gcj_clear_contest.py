@@ -44,7 +44,15 @@ def main():
     parser.add_option('-p', '--passwd', action='store', dest='password',
                       help=('Password used to login in the server, will be '
                             'asked if not specified'))
+    parser.add_option('--base_dir', action='store', dest='base_dir',
+                      help=('Base directory used to parametrize configuration '
+                            'file paths'))
+    parser.set_defaults(base_dir=os.path.dirname(__file__))
     options, args = parser.parse_args()
+
+    # Store the script location in a runtime constant, so it can be used by
+    # the library to locate the configuration files.
+    constants.SetRuntimeConstant('base_dir', options.base_dir)
 
     # Check that the number of arguments is valid.
     if len(args) != 0:

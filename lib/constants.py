@@ -19,6 +19,29 @@
 
 
 
-VERSION = 'v1.0-beta1'
-USER_CONFIG_FILE = 'config/user_config.py'
-CURRENT_CONFIG_FILE = 'config/current_config.py'
+VERSION = 'v1.0-beta3'
+USER_CONFIG_PATH = '{base_dir}/config/user_config.py'
+CURRENT_CONFIG_PATH = '{base_dir}/config/current_config.py'
+
+
+_runtime_constants = {}
+
+
+def GetRuntimeConstant(key, default_value=None):
+  """Get a constant from the runtime_constants dictionary.
+
+  Args:
+    key: Key used to index the dictionary when retrieving the stored value.
+    default_value: Value to be returned if the key is not in the dictionary.
+  """
+  return _runtime_constants.get(key, default_value)
+
+
+def SetRuntimeConstant(key, value):
+  """Store a constant into the runtime_constants dictionary.
+
+  Args:
+    key: Key used to index the dictionary when retrieving the stored value.
+    value: Value to store in the dictionary.
+  """
+  _runtime_constants[key] = value

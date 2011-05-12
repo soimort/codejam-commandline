@@ -144,22 +144,41 @@ def _ValidateContestData(middleware_tokens, problems):
     return False
 
 
-def Initialize(contest_id, password=None):
-  """Initialize configuration for the specified contest, storing the retrieved
-  data in the current configuration file.
+def Initialize(tournament_id, contest_id, password=None):
+  """Initialize configuration for the specified tournament or contest.
+
+  This function initializes the tool for a contest. If the contest is None,
+  the tool will be initialized for the current contest of the specified
+  tournament.
+
+  Either one of tournament_id or contest_id must be not None.
+
+  The retrieved data is stored in the current configuration file.
 
   Args:
-    contest_id: ID of the contest to initialize.
+    tournament_id: ID of the tournament whose current contest must be
+      initialized.
+    contest_id: ID of the contest to initialize. If None, the server will ask
+      for the current contest of the specified tournament.
     password: Password specified by the user, if any.
+
+  Raises:
+    error.ConfigurationError: If the contest data is invalid or incomplete.
+    error.UserError: If no contest was specified and there is no running contest
+      for the specified tournament.
   """
   # Reset the current configuration file with the one provided by the user and
   # renew the cookie, so the middleware tokens are retrieved correctly.
   try:
-    shutil.copy(constants.USER_CONFIG_FILE, constants.CURRENT_CONFIG_FILE)
+    user_config_path = data_manager.ParametrizeConfigPath(
+        constants.USER_CONFIG_PATH)
+    current_config_path = data_manager.ParametrizeConfigPath(
+        constants.CURRENT_CONFIG_PATH)
+    shutil.copy(user_config_path, current_config_path)
     code_jam_login.Login(password)
   except OSError as e:
     raise error.InternalError('Configuration file {0} could not be created: '
-                              '{1}.\n'.format(constants.CURRENT_CONFIG_FILE, e))
+                              '{1}.\n'.format(current_config_path, e))
 
   # Read the current configuration file and extract the host and the cookie.
   try:
@@ -170,6 +189,16 @@ def Initialize(contest_id, password=None):
     # Indicate that no host or cookie was configured and exit with error.
     raise error.ConfigurationError('No host or login cookie found in the '
                                    'configuration file: {0}.\n'.format(e))
+
+  # Get the current contest if no contest id was specified. If there is no
+  # running contest show an error to the user.
+  if contest_id is None:
+    contest_id = GetCurrentContestId(host, cookie, tournament_id)
+    if contest_id is None:
+      raise error.UserError('No contest is running for tournament %s and no '
+                            'contest id was specified.\n' % tournament_id)
+    sys.stdout.write('Initializing tool for current contest with id %s.\n' %
+                     contest_id)
 
   # Retrieve the problem list and validate the extracted contest data and exit
   # if there is any error.
@@ -200,7 +229,9 @@ def IsInitialized():
   """
   # Check if the current configuration file exists, otherwise the contest has
   # not been initialized yet.
-  if not os.path.isfile(constants.CURRENT_CONFIG_FILE):
+  current_config_path = data_manager.ParametrizeConfigPath(
+      constants.CURRENT_CONFIG_PATH)
+  if not os.path.isfile(current_config_path):
     return False
 
   # Read the current config and check that all contest-related fields exist.
@@ -221,15 +252,54 @@ def ClearContest():
   # show a warning if the configuration is not a regular file (should not happen
   # under normal conditions).
   try:
-    if os.path.isfile(constants.CURRENT_CONFIG_FILE):
-      os.remove(constants.CURRENT_CONFIG_FILE)
-    elif os.path.exists(constants.CURRENT_CONFIG_FILE):
+    current_config_path = data_manager.ParametrizeConfigPath(
+        constants.CURRENT_CONFIG_PATH)
+    if os.path.isfile(current_config_path):
+      os.remove(current_config_path)
+    elif os.path.exists(current_config_path):
       sys.stderr.write('Warning: Cannot erase current configuration file "{0}" '
                        'because it is not a regular file.\n'.format(
-                           constants.CURRENT_CONFIG_FILE))
+                           current_config_path))
   except OSError as e:
     raise error.InternalError('OS error happened while deleting file "{0}": '
                               '{1}.\n'.format(filename, e))
+
+
+def GetCurrentContestId(host, cookie, tournament_id):
+  # Send an HTTP request to get the problem list from the server.
+  sys.stdout.write('Getting current contest of tournament {0} from '
+                   '"{1}"...\n'.format(tournament_id, host))
+  request_arguments = {
+      't': tournament_id,
+      'zx': str(int(time.time())),
+      }
+  request_headers = {
+      'Referer': 'http://{0}/codejam',
+      'Cookie': cookie,
+      }
+  try:
+    status, reason, response = http_interface.Get(
+        host, '/codejam/contest/microsite-info', request_arguments,
+        request_headers)
+  except httplib.HTTPException as e:
+    raise error.NetworkError('HTTP exception while retrieving current contest '
+                             'from the Google Code Jam server: '
+                             '{0}.\n'.format(e))
+
+  # Check if the status is not good.
+  if status != 200 or reason != 'OK':
+    raise error.ServerError('Error while communicating with the server, cannot '
+                            'get current contest. Check that the host and '
+                            'username are valid.\n')
+
+  # Parse the JSON response and extract the contest status from it.
+  try:
+    json_response = json.loads(response)
+    return json_response.get('contestId', None)
+  except ValueError as e:
+    raise error.ServerError('Invalid response received from the server, cannot '
+                            'get current contest. Check that the tournament id '
+                            'is valid: {0}.\n'.format(e))
 
 
 def GetContestStatus(host, cookie, get_initial_values_token, contest_id):

@@ -19,9 +19,9 @@
 
 
 
+import StringIO
 import gzip
 import os
-import random
 import zipfile
 
 from lib import error
@@ -29,8 +29,6 @@ from lib import error
 
 def UnzipData(zipped_data):
   """Unzip the specified data using a temporary file and the gzip library.
-  After the data is unzipped, the temporary file is erased, so no special
-  cleanup is necessary.
 
   Args:
     A byte array with the zipped data.
@@ -39,43 +37,28 @@ def UnzipData(zipped_data):
     A byte array with the unzipped data.
 
   Raises:
-    error.InternalError: If any I/O or OS error occurs while unzipping the data.
+    error.InternalError: If any I/O or Unicode error occurs while unzipping the
+      data.
   """
-  # Write the zipped data into a temporary file (using a random name to prevent
-  # collisions).
+  # Uncompress the zipped data using a memory-mapped file.
   try:
-    zip_filename = 'tempZipFile_{0}.gz'.format(random.randrange(0, 2**31 - 1))
-    zip_file = open(zip_filename, 'wb')
-    zip_file.write(zipped_data)
-    zip_file.close()
-  except IOError as e:
-    raise error.InternalError('I/O error while writing zipped data to "{0}": '
-                              '{1}.\n'.format(zip_filename, e))
-
-  # Open the file using gzip and get the unzipped contents.
-  try:
-    unzipped_file = gzip.open(zip_filename, 'rb')
+    zipped_memfile = StringIO.StringIO(zipped_data)
+    unzipped_file = gzip.GzipFile(fileobj=zipped_memfile, mode='rb')
     unzipped_data = unzipped_file.read()
     unzipped_file.close()
+    zipped_memfile.close()
+    return unzipped_data
+
+  except UnicodeError as e:
+    raise error.InternalError('Unicode error while parsing zipped data: '
+                              '{0}.\n'.format(e))
   except IOError as e:
-    raise error.InternalError('I/O error while reading unzipped data from '
-                              '"{0}": {1}.\n'.format(zip_filename, e))
-
-  # Remove the temporary zipped file.
-  try:
-    os.remove(zip_filename)
-  except OSError as e:
-    raise error.InternalError('OS error while removing zipped data at "{0}": '
-                              '{1}.\n'.format(zip_filename, e))
-
-  # Return the unzipped string.
-  return unzipped_data
+    raise error.InternalError('I/O error while decompressing unzipped data: '
+                              '{0}.\n'.format(e))
 
 
 def ZipData(unzipped_data):
   """Zip the specified data using a temporary file and the gzip library.
-  After the data is zipped, the temporary file is erased, so no special
-  cleanup is necessary.
 
   Args:
     A byte array with the unzipped data.
@@ -84,61 +67,53 @@ def ZipData(unzipped_data):
     A byte array with the zipped data.
 
   Raises:
-    error.InternalError: If any I/O or OS error occurs while unzipping the data.
+    error.InternalError: If any I/O or Unicode error occurs while unzipping the
+      data.
   """
-  # Compress the data and write it to a temporary file (using a random name to
-  # prevent collisions).
   try:
-    zip_filename = 'tempZipFile_{0}.gz'.format(random.randrange(0, 2**31 - 1))
-    compress_file = gzip.open(zip_filename, 'wb')
-    compress_file.write(unzipped_data)
-    compress_file.close()
-  except IOError as e:
-    raise error.InternalError('I/O error while compressing data into "{0}": '
-                              '{1}.\n'.format(zip_filename, e))
-
-  # Open the file normally and get the zipped contents.
-  try:
-    zipped_file = open(zip_filename, 'rb')
-    zipped_data = zipped_file.read()
+    # Compress the unzipped data into a memory-mapped file.
+    zipped_memfile = StringIO.StringIO()
+    zipped_file = gzip.GzipFile(fileobj=zipped_memfile, mode='wb')
+    zipped_file.write(unzipped_data)
     zipped_file.close()
+
+    # Extract the zipped data from the memory-mapped file, release it and
+    # return the zipped data.
+    zipped_data = zipped_memfile.getvalue()
+    zipped_memfile.close()
+    return zipped_data
+
+  except UnicodeError as e:
+    raise error.InternalError('Unicode error while parsing zipped data: '
+                              '{0}.\n'.format(e))
   except IOError as e:
-    raise error.InternalError('I/O error while reading unzipped data from '
-                              '"{0}": {1}.\n'.format(zip_filename, e))
-
-  # Remove the temporary zipped file.
-  try:
-    os.remove(zip_filename)
-  except OSError as e:
-    raise error.InternalError('OS error happened while removing zipped data at '
-                              '"{0}": {1}.\n'.format(zip_filename, e))
-
-  # Return the zipped string.
-  return zipped_data
+    raise error.InternalError('I/O error while decompressing unzipped data: '
+                              '{0}.\n'.format(e))
 
 
-def MakeZipFile(source_files, zip_filename, ignore_exts=None):
-  """Create a zip file with the specified source files, which can include
-  directories. Specified directories will be traversed and added recursively
-  to the output file, ignoring those with the banned extensions.
+def MakeZipFile(source_files, output_file, ignore_exts=None):
+  """Create a zip file with the specified source files.
+
+  The source_files sequence can include directories, which will be traversed and
+  added recursively to the output file, ignoring those with banned extensions.
 
   Args:
     source_files: A collection with all source files or directories to zip.
-    zip_filename: Name of the zip file to generate.
+    output_file: Name or file-like object where the zip file must be generated.
     ignore_exts: A collection with all the extensions to ignore.
 
   Returns:
     A list with all the ignored files during the zip file creation.
 
   Raises:
-    error.InternalError: If any I/O or OS error occurs while unzipping the data.
+    error.InternalError: If any I/O or OS error occurs while zipping the data.
   """
   if ignore_exts is None:
     ignore_exts = []
 
   try:
     # Open the destination zip file and initialize the ignored files set.
-    zip_file = zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED)
+    zip_file = zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED)
     ignored_files = set()
 
     # Put all specified sources in the zip file, ignoring files with the
@@ -159,23 +134,55 @@ def MakeZipFile(source_files, zip_filename, ignore_exts=None):
             if os.path.splitext(filename)[1] not in ignore_exts:
               zip_file.write(base_filename)
             else:
-              ignored_files.update([base_filename])
+              ignored_files.add(base_filename)
       else:
         # Add a file to the zip if and only if it extension is not in the
         # ignore list. Otherwise, add it to the ignored files set.
         if os.path.splitext(source_filename)[1] not in ignore_exts:
           zip_file.write(source_filename)
         else:
-          ignored_files.update([source_filename])
+          ignored_files.add(source_filename)
 
     # Close the zip file and return the ignored files set.
     zip_file.close()
     return ignored_files
 
   except IOError as e:
-    raise error.InternalError('I/O error while creating zip file "{0}": '
-                              '{1}.\n'.format(zip_filename, e))
+    raise error.InternalError('I/O error while creating zip file: '
+                              '{0}.\n'.format(e))
 
   except OSError as e:
-    raise error.InternalError('OS error while creating zip file "{0}": '
-                              '{1}.\n'.format(zip_filename, e))
+    raise error.InternalError('OS error while creating zip file: '
+                              '{0}.\n'.format(e))
+
+
+def MakeZipFileInMemory(source_files, ignore_exts=None):
+  """Create a zip file with the specified source files in memory.
+
+  The source_files sequence can include directories, which will be traversed and
+  added recursively to the output file, ignoring those with banned extensions.
+
+  Args:
+    source_files: A collection with all source files or directories to zip.
+    ignore_exts: A collection with all the extensions to ignore.
+
+  Returns:
+    A (zip_output, ignored_files) tuple, where zip_output are the contents of
+    the generated zip file and ignored_files is a list with all the ignored
+    files during the zip file creation.
+
+  Raises:
+    error.InternalError: If any Unicode error occurs while zipping the data.
+  """
+  # Create a memory-mapped file and create the zip file on it. Then, get its
+  # contents, close the file and return.
+  try:
+    output_file = StringIO.StringIO()
+    ignored_files = MakeZipFile(source_files, output_file, ignore_exts)
+    zip_output = output_file.getvalue()
+    output_file.close()
+    return zip_output, ignored_files
+
+  except UnicodeError as e:
+    raise error.InternalError('Unicode error while parsing zipped data: '
+                              '{0}.\n'.format(e))

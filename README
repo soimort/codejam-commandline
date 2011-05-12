@@ -1,4 +1,4 @@
-GCJ Commandline submit tool, v1.0-beta2
+GCJ Commandline submit tool, v1.0-beta3
 Copyright 2010 Google Inc. All Rights Reserved.
 
 Download and submit tool for the Google Code Jam
@@ -24,7 +24,7 @@ TABLE OF CONTENTS:
 -------------------------------------------------------------------------------
 0. DISCLAIMER
 
-GCJ Commandline submit tool, v1.0-beta2
+GCJ Commandline submit tool, v1.0-beta3
 Copyright 2010 Google Inc. All Rights Reserved.
 
 This program is free software: you can redistribute it and/or modify
@@ -99,6 +99,10 @@ names and the middleware tokens required to transfer information.
 Then, all this information, including the login cookie and the information in
 the user configuration file, is stored in the current configuration file (found
 at config/current_config.py).
+
+If you don't specify a contest id for this script, it will attempt to initialize
+the tool for the current contest. If no contest is running it will print an
+error message.
 
 NOTE: Your password is not stored in the current configuration file if you did
 not entered it in the user configuration file.
@@ -215,7 +219,10 @@ the Python str.format() function.
 
 If you want to change the path of the configuration file, look at the
 lib/constants.py file and change the respective variables. Remember that those
-paths are relative to the current directory, not to the lib directory.
+paths are relative to the current directory, not to the lib directory. You could
+also use absolute paths or use the placeholder '{base_dir}' (quotes for
+clarity); this placeholder will be substituted by the directory where the tool
+is in the filesystem.
 
 IMPORTANT: Scripts stores information from the current contest along with the
 user information in the current configuration file (config/current_config.py).
@@ -253,11 +260,15 @@ solution for a large input. These confirmations can be skipped by passing the
 
 4a. Contest crawler
 
-This script is the gcj_init_contest.py script and receives one positional
-argument which is the contest id (see Section 2b for instructions on how to
-retrieve a contest id), that is used to retrieve the important information of
-the contest, i.e., number of problems, middleware authentication tokens,
-problem ids, etc.
+This script is the gcj_init_contest.py script and receives one optional
+positional argument which is the contest id (see Section 2b for instructions on
+how to retrieve a contest id), that is used to retrieve the important
+information of the contest, i.e., number of problems, middleware authentication
+tokens, problem ids, etc.
+
+If no contest id is specified in the arguments, this script will retrieve the
+id of the current contest and initialize the tool for it. If there is no running
+contest an error message will be shown to the user.
 
 This script should be run once before each contest, so the correct information
 is retrieved. Otherwise, all other scripts might fail because no contest data
