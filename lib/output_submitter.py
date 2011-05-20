@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 #
 # Copyright 2011 Google Inc.
@@ -26,6 +26,7 @@ import random
 import shutil
 import sys
 
+from lib import constants
 from lib import error
 from lib import http_interface
 from lib import multipart_data
@@ -227,6 +228,7 @@ class OutputSubmitter(object):
     body_data.AddString('problem', self.problem_id)
     body_data.AddString('input_id', input_id)
     body_data.AddString('num_source_files', str(len(source_files)))
+    body_data.AddString('agent', constants.CODEJAM_AGENT_NAME)
 
     # Get the message body and check if compression was requested.
     request_body = str(body_data)

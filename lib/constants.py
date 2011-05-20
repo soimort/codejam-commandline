@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 #
 # Copyright 2011 Google Inc.
@@ -20,6 +20,7 @@
 
 
 VERSION = 'v1.0-beta3'
+CODEJAM_AGENT_NAME = 'cmdline-%s' % VERSION
 USER_CONFIG_PATH = '{base_dir}/config/user_config.py'
 CURRENT_CONFIG_PATH = '{base_dir}/config/current_config.py'
 

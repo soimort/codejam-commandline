@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 #
 # Copyright 2011 Google Inc.
@@ -30,7 +30,20 @@ from lib import http_interface
 
 class UserSubmission(object):
   """A submission for a problem input, including result and timestamp."""
-  _CORRECT_STATUSES = frozenset(['Correct'])
+  # There is are two statuses that are treated in a special way:
+  #
+  # - Submitted: This status is assigned to submissions for inputs for which the
+  #   judgement is not yet available. We optimistically consider Submitted
+  #   inputs to be correct.
+  #
+  # - Correct (+4 minutes): This status marks a solution as correct but also
+  #   adds a 4 minute penalty. To count these submissions correctly, we mark
+  #   them as correct and wrong at the same time, which gives points to the user
+  #   but also adds one wrong try in that input.
+  _CORRECT_STATUSES = frozenset(['Correct', 'Submitted',
+                                 'Correct (+4 minutes)'])
+  _WRONG_STATUSES = frozenset(['Incorrect', 'Time Expired',
+                               'Correct (+4 minutes)'])
   _TIME_UNITS_TO_SECONDS = {'h': 3600, 'm': 60, 's': 1}
 
   def __init__(self, key, problem, input_name, status, timestamp):
@@ -49,6 +62,7 @@ class UserSubmission(object):
     self.input_name = input_name
     self.status = status
     self.correct = UserSubmission._GetCorrectnessFromStatus(self.status)
+    self.wrong = UserSubmission._GetWrongnessFromStatus(self.status)
     self.timestamp = timestamp
 
   @staticmethod
@@ -63,6 +77,19 @@ class UserSubmission(object):
     """
     # Correct types are specified in the _CORRECT_STATUSES set.
     return status in UserSubmission._CORRECT_STATUSES
+
+  @staticmethod
+  def _GetWrongnessFromStatus(status):
+    """Check whether the submission is wrong given its status.
+
+    Args:
+      status: String with a submission's status.
+
+    Returns:
+      True if the submission's output is wrong.
+    """
+    # Wrong types are specified in the _WRONG_STATUSES set.
+    return status in UserSubmission._WRONG_STATUSES
 
   @staticmethod
   def _GetProblemIndexFromKey(problems, problem_key):

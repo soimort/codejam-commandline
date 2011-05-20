@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 #
 # Copyright 2011 Google Inc.
@@ -38,7 +38,7 @@ class ProblemInputStatus(object):
     """Constructor.
 
     Args:
-      input_type: Either 'small' or 'large'.
+      input_type: String with this status's input type (e.g., small or large).
       solved_time: Number of seconds elapsed since the beginning of the contest
           at which this problem input was solved, or -1 if it has not been
           solved yet.
@@ -199,3 +199,69 @@ def GetUserStatus(host, cookie, middleware_token, contest_id, input_spec):
     raise error.ServerError('Invalid response received from the server, cannot '
                             'get user status. Check that the contest id is '
                             'valid: {0}.\n'.format(e))
+
+
+def _GetInputStatusForSubmission(status, submission, input_spec):
+  """Return the problem input status for a submission.
+
+  Args:
+    status: user_status.UserStatus object with the current user status.
+    submission: user_submission.UserSubmission object whose problem input status
+      must be retrieved.
+    input_spec: Dictionary with the input specification, mapping from input name
+        to another dictionary with a 'input_id' key.
+
+  Returns:
+    An user_status.ProblemInputStatus object with the problem input status
+    corresponding to the submission.
+  """
+  # Get the input status from all problem inputs using the problem index
+  # and the input id in the submission.
+  input_index = int(input_spec[submission.input_name]['input_id'])
+  return status.problem_inputs[submission.problem][input_index]
+
+
+def FixStatusWithSubmissions(status, submissions, input_spec):
+  """Calculate problem input statuses from user submissions.
+
+  Args:
+    status: user_status.UserStatus to modify.
+    submissions: Sequence of user_submissions.UserSubmission objects with the
+      user submissions. If None, an empty list will be used.
+    input_spec: Dictionary with the input specification, keyed by input name.
+  """
+  # The submissions array might be None, in this case substitute it with an
+  # empty list.
+  if submissions is None:
+    submissions = []
+
+  # Reset all information in problem input statuses (except for current
+  # attempts), everything will be calculated from scratch using the submissions.
+  for problem_status in status.problem_inputs:
+    for input_status in problem_status:
+      input_status.solved_time = -1
+      input_status.wrong_tries = 0
+      input_status.submitted = False
+
+  # Make a first pass over all submissions to mark correctly solved problem
+  # inputs and get the right timestamp.
+  for submission in submissions:
+    # Get the corresponding input status and update submission flag. Then update
+    # solved time if this submission is correct.
+    input_status = _GetInputStatusForSubmission(status, submission, input_spec)
+    input_status.submitted = True
+    if submission.correct:
+      if (input_status.solved_time == -1 or
+          submission.timestamp < input_status.solved_time):
+        input_status.solved_time = submission.timestamp
+
+  # Make a second pass over all submissions to count all wrong attempts, taking
+  # of ignoring attempts after the first correct submission.
+  for submission in submissions:
+    # Get the corresponding input status and count it as wrong if it is wrong
+    # and was submitted before the problem input was submitted correctly.
+    input_status = _GetInputStatusForSubmission(status, submission, input_spec)
+    if submission.wrong:
+      if (input_status.solved_time == -1 or
+          submission.timestamp <= input_status.solved_time):
+        input_status.wrong_tries += 1

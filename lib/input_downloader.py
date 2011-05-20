@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 #
 # Copyright 2011 Google Inc.
@@ -23,6 +23,7 @@ input from a codejam problem."""
 import httplib
 import sys
 
+from lib import constants
 from lib import error
 from lib import http_interface
 
@@ -67,6 +68,7 @@ class InputDownloader(object):
         'filename': filename,
         'input_file_type': '0',
         'csrfmiddlewaretoken': self.middleware_token,
+        'agent': constants.CODEJAM_AGENT_NAME,
         }
     request_headers = {
         'Referer': request_referer,

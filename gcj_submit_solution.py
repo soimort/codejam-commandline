@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 #
 # Copyright 2011 Google Inc.
@@ -191,7 +191,7 @@ def main():
 
     # There is no sensible default for the main source, so exit with error if no
     # value is found and it wasn't ignored.
-    if not options.ignore_def_source and not source_names_format:
+    if not options.ignore_def_source and source_names_format is None:
       raise error.UserError(
           'No format found for the default sources file name. Specify '
           '"source_name_format" in the configuration file or ignore it passing '
@@ -285,6 +285,17 @@ def main():
         print 'Submitting output and source files.'
     else:
       print 'Submitting practice output and source files.'
+
+    # Check if the contest is running and no source file is being included, show
+    # a warning to the user indicating that he/she might be disqualified because
+    # of this. This confirmation cannot be skipped by using --force.
+    if contest_status == contest_manager.ACTIVE and not source_names:
+      submit_message = ('You did not include source code files for this '
+                        'attempt. Submitting output files without source code '
+                        'can lead to disqualification.'.format(
+                            problem_letter, input_type))
+      utils.AskConfirmationOrDie(submit_message, 'Are you sure', False)
+      print 'Submitting without source files.'
 
     # Create the output submitter and send the files.
     submitter = output_submitter.OutputSubmitter(

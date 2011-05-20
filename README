@@ -12,7 +12,8 @@ TABLE OF CONTENTS:
   b. Initializing the contest
   c. Downloading an input
   d. Submitting a solution
-  e. Cleaning the contest
+  e. Checking your status
+  f. Cleaning the contest
 3. Configuration files
 4. Executable files
   a. Contest crawler
@@ -73,7 +74,9 @@ Three values are needed to run the software:
 
 - source_names_format: This is a list of strings that specify the default
   sources to be included with an output file. In this example, we will assume
-  we use C++ and set it to ['{problem}-{input}-{id}.cpp'].
+  we use C++ and set it to ['{problem}-{input}-{id}.cpp']. Remember to change it
+  before a contest or you might end submitting the included source code by
+  accident!
 
 Look at Section 3 for more information about these and many more configuration
 parameters.
@@ -169,7 +172,32 @@ string. The most important values are:
   try again. This attempt did not count as a wrong answer.
 
 
-2e. Cleaning the contest
+2e. Checking your status
+
+During the contest you can check your status by using the gcj_get_status.py
+script, which will show you your current rank, number of points, time at which
+input has been solved, number of wrong attempts per input and remaining time for
+current attempts.
+
+To run this script you should execute:
+
+$ ./gcj_get_status.py
+
+which will show an output like this one:
+
+Rank: 194 (66 points)
+Problem: Snapper Chain
+  small: 00:15:16 (2 wrong tries)
+  large: 00:19:11
+Problem: Fair Warning
+  small: --:--:-- (1 wrong try) << 2:31 left
+  large: --:--:--
+Problem: Theme Park
+  small: 01:42:45
+  large: 01:47:18 << 6:38 left
+
+
+2f. Cleaning the contest
 
 After the contest is over, you can clean all contest-related information using
 the ./gcj_clear_contest.py script, which receives no parameters. This script

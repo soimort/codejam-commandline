@@ -1,8 +1,12 @@
 -------------------------------------------------------------------------------
-GCJ Command Line v1.0-beta3, released 2011-05-10
+GCJ Command Line v1.0-beta3, released 2011-05-12
+
+[Feature]: New script to get the current user status from the server, showing
+           the time at which each input was solved, wrong tries and time left
+           for the current attempt.
 
 [Feature]: Add support to parametrize configuration file paths with the base
-           directories. Use --base_dir option to override auto-detection.
+           directory. Use --base_dir option to override auto-detection.
 
 [Feature]: Init contest script now autodetects the current contest if no contest
            id is specified in the arguments.
