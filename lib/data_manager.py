@@ -39,6 +39,18 @@ _DEFAULT_DATA = {
     }
 
 
+def _PrepareFileData(file_lines):
+  # For each line, remove comments and trim all spaces at beginning and the end.
+  for i in xrange(len(file_lines)):
+    comment_index = file_lines[i].find('#')
+    if comment_index != -1:
+      file_lines[i] = file_lines[i][:comment_index]
+    file_lines[i] = file_lines[i].strip()
+
+  # Join all lines into a single string, being careful to remove empty lines.
+  return '\n'.join(line for line in file_lines if line)
+
+
 def _ReadDataImpl(filename):
   """Read the persistent data from the specified file, which should be
   formatted as a python dict.
@@ -53,12 +65,15 @@ def _ReadDataImpl(filename):
     error.InternalError: If there is any error while reading the data from the
       file.
   """
-  # Open the specified file and get its contents. Then evaluate the file data
-  # directly, as it is formatted as a python dict.
   try:
+    # Open the configuration file and read all lines from it.
     file = open(filename, 'rt')
-    file_data = file.read()
+    file_lines = file.readlines()
     file.close()
+
+    # Prepare the file data to prevent mistakes and evaluate it as if it were a
+    # python dictionary.
+    file_data = _PrepareFileData(file_lines)
     return eval(file_data, {}, {})
   except IOError as e:
     raise error.InternalError('IO error happened while reading data from file '
@@ -85,11 +100,12 @@ def _WriteDataImpl(data, filename):
 
     # Open the file and store each item inside it.
     file = open(filename, 'wt')
-    file.write('{\n');
+    file.write('# -*- coding: utf-8 -*-\n')
+    file.write('{\n')
     for key, value in sorted(data.iteritems()):
       item_line = item_format.format(repr(key), repr(value))
       file.write('{0}\n'.format(item_line))
-    file.write('}\n');
+    file.write('}\n')
     file.close()
   except IOError as e:
     raise error.InternalError('IO error happened while writing data to file '

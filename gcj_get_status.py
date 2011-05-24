@@ -135,22 +135,27 @@ def main():
     if not cookie or options.renew_cookie:
       cookie = code_jam_login.Login(options.password)
 
-    # Extract the contest id and initialize the contest.
+    # Get user's status and check if he/she is participating.
     status = user_status.GetUserStatus(
         host, cookie, user_status_token, contest_id, input_spec)
-    submissions = user_submissions.GetUserSubmissions(
-        host, cookie, contest_id, problems, input_spec)
-    user_status.FixStatusWithSubmissions(status, submissions, input_spec)
+    if status is not None:
+      # Get user's submissions and use them to fix the user's status.
+      submissions = user_submissions.GetUserSubmissions(
+          host, cookie, contest_id, problems, input_spec)
+      user_status.FixStatusWithSubmissions(status, submissions, input_spec)
 
-    # Show each problem input status to the user.
-    print '-' * 79
-    print 'User status at contest {0}'.format(contest_id)
-    print '-' * 79
-    print 'Rank: {0} ({1} points)'.format(status.rank, status.points)
-    for problem, problem_status in zip(problems, status.problem_inputs):
-      print 'Problem: {0}'.format(problem['name'])
-      for input_status in problem_status:
-        print '  {0}'.format(FormatProblemInputStatus(input_status))
+      # Show each problem input status to the user.
+      print '-' * 79
+      print 'User status at contest {0}'.format(contest_id)
+      print '-' * 79
+      print 'Rank: {0} ({1} points)'.format(status.rank, status.points)
+      for problem, problem_status in zip(problems, status.problem_inputs):
+        print 'Problem: {0}'.format(problem['name'])
+        for input_status in problem_status:
+          print '  {0}'.format(FormatProblemInputStatus(input_status))
+    else:
+      # Show error message, user is not participating in the contest.
+      print 'User status not found at contest {0}'.format(contest_id)
 
   except error.OptionError as e:
     parser.print_usage()

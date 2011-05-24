@@ -98,7 +98,7 @@ def main():
 
     # Store the script location in a runtime constant, so it can be used by
     # the library to locate the configuration files.
-    constants.SetRuntimeConstant('base_dir', os.path.dirname(__file__))
+    constants.SetRuntimeConstant('base_dir', options.base_dir)
 
     # Check that the number of arguments is valid.
     if len(args) != 3:
@@ -121,7 +121,7 @@ def main():
     if not contest_manager.IsInitialized():
       raise error.ConfigurationError(
           'Contest is not initialized, please initialize the contest before '
-          'trying to download input files.\n')
+          'trying to submit output files.\n')
 
     # Read user and input information from the config file.
     try:
