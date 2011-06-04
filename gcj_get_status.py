@@ -94,7 +94,8 @@ def main():
     parser.add_option('--base_dir', action='store', dest='base_dir',
                       help=('Base directory used to parametrize configuration '
                             'file paths'))
-    parser.set_defaults(renew_cookie=False, base_dir=os.path.dirname(__file__))
+    parser.set_defaults(renew_cookie=False,
+                        base_dir=os.path.dirname(os.path.realpath(__file__)))
     options, args = parser.parse_args()
 
     # Store the script location in a runtime constant, so it can be used by

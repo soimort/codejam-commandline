@@ -1,4 +1,4 @@
-GCJ Commandline submit tool, v1.0-beta3
+GCJ Commandline submit tool, v1.0-beta4
 Copyright 2010 Google Inc. All Rights Reserved.
 
 Download and submit tool for the Google Code Jam
@@ -127,8 +127,8 @@ which will download the input file and store it in source/A-small-0.in. Now
 it is time to run your solution and generate the output file.
 
 NOTE: This script downloads an input file for the specified problem and starts
-its timer without asking a confirmation. You should double-check the parameters
-before running it or you might start a timer for another problem.
+its timer without asking for confirmation. You should double-check the
+parameters before running it or you might start a timer for another problem.
 
 NOTE: Downloading an input file twice in the same attempt will just redownload
 the same input file if its timer has *NOT* expired. Otherwise, it will download
@@ -155,9 +155,9 @@ to submit two extra files called library.cpp and template.txt you can execute:
 $ ./gcj_submit_solution.py -a library.cpp -a template.txt A small 0
 
 which will submit the file source/A-small-0.out as the answer and
-source/A-small-0.cpp and library.cpp as the source files. If you add a
-directory using the -a option, the program will compress it into a zip file
-before submitting it.
+source/A-small-0.cpp, library.cpp and template.txt as the source files. If you
+add a directory using the -a option, the program will compress it into a zip
+file before submitting it.
 
 After submitting the file, the Code Jam server will answer with a message
 string. The most important values are:
@@ -176,7 +176,7 @@ string. The most important values are:
 
 During the contest you can check your status by using the gcj_get_status.py
 script, which will show you your current rank, number of points, time at which
-input has been solved, number of wrong attempts per input and remaining time for
+each input was solved, number of wrong attempts per input and remaining time for
 current attempts.
 
 To run this script you should execute:

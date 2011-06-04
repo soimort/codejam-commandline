@@ -19,6 +19,7 @@
 
 
 
+import glob
 import httplib
 import json
 import os
@@ -51,14 +52,16 @@ class OutputSubmitter(object):
     self.contest_id = contest_id
     self.problem_id = problem_id
 
-  def _PrepareSourceFiles(self, source_names):
+  def _PrepareSourceFiles(self, source_patterns):
     """Zip all source directories into files and return them.
 
     The returned list will contain (filename, file_data) tuples, where file_data
     will be None for files that have not been read yet.
 
     Args:
-      source_names: List with all the files to include with the solution.
+      source_patterns: List with all the file patterns to include with the
+        solution. These file patterns will be expanded using python's glob
+        module.
 
     Returns:
       A (source_files, ignored_zips) tuple, where source_files is a list of
@@ -70,23 +73,25 @@ class OutputSubmitter(object):
     source_files = []
     ignored_zips = set()
 
-    # Process each source specified by the user.
-    for source in source_names:
-      # Check if the source is a directory or a file.
-      if os.path.isdir(source):
-        # Create a zip file in memory for the directory, add it to the source
-        # files and update the ignored_zips set.
-        sys.stdout.write('Compressing directory "{0}"...\n'.format(source))
-        zipped_contents, newly_ignored_zips = (
-            zip_utils.MakeZipFileInMemory([source], ignore_exts=['.zip']))
-        ignored_zips.update(newly_ignored_zips)
-        flat_source_name = source.replace('\\', '_').replace('/', '_')
-        zip_filename = '{1}_{0}.zip'.format(random.randrange(0, 2**31 - 1),
-                                            flat_source_name)
-        source_files.append((zip_filename, zipped_contents))
-      else:
-        # Add files directly to the prepared sources.
-        source_files.append((source, None))
+    # Process each source pattern specified by the user, expanding them using
+    # the python's glob module.
+    for source_pattern in source_patterns:
+      for source in glob.iglob(source_pattern):
+        # Check if the source is a directory or a file.
+        if os.path.isdir(source):
+          # Create a zip file in memory for the directory, add it to the source
+          # files and update the ignored_zips set.
+          sys.stdout.write('Compressing directory "{0}"...\n'.format(source))
+          zipped_contents, newly_ignored_zips = (
+              zip_utils.MakeZipFileInMemory([source], ignore_exts=['.zip']))
+          ignored_zips.update(newly_ignored_zips)
+          flat_source_name = source.replace('\\', '_').replace('/', '_')
+          zip_filename = '{1}_{0}.zip'.format(random.randrange(0, 2**31 - 1),
+                                              flat_source_name)
+          source_files.append((zip_filename, zipped_contents))
+        else:
+          # Add files directly to the prepared sources.
+          source_files.append((source, None))
 
     # Return all generated sets.
     return source_files, ignored_zips
@@ -123,7 +128,7 @@ class OutputSubmitter(object):
                               'cannot submit solution. Check that the host, '
                               'user and contest id are valid: {0}.\n'.format(e))
 
-  def Submit(self, input_id, output_name, source_names, input_public,
+  def Submit(self, input_id, output_name, source_patterns, input_public,
              gzip_body=True, zip_sources=False, add_ignored_zips=False):
     """Submit the specified output and sources file to the problem.
 
@@ -131,7 +136,8 @@ class OutputSubmitter(object):
       input_id: Identifier of the output to submit ('0' for the small output,
         '1' for the large output).
       output_name: Name of the file with the output data.
-      source_names: Names of the source files to be included with the output.
+      source_patterns: Name patterns of the source files to be included with the
+        output. These patterns will be expanded using Python's glob module.
       input_public: Boolean indicating whether the answer is public or not.
       gzip_body: Boolean indicating whether the body has to be gzipped or not.
       zip_sources: Boolean indicating whether all sources should be put inside a
@@ -150,7 +156,7 @@ class OutputSubmitter(object):
     # Prepare the source files (zipping all directories). After this,
     # source_files will only contain text files and zip files specified directly
     # or by compressing a directory.
-    source_files, ignored_zips = self._PrepareSourceFiles(set(source_names))
+    source_files, ignored_zips = self._PrepareSourceFiles(set(source_patterns))
 
     # Check if the user requested to zip source files.
     if zip_sources:

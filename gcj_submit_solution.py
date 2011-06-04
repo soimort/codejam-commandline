@@ -93,7 +93,7 @@ def main():
     parser.set_defaults(renew_login=False, force=False, gzip_content=True,
                         zip_sources=False, ignore_zip=False,
                         ignore_def_source=False,
-                        base_dir=os.path.dirname(__file__))
+                        base_dir=os.path.dirname(os.path.realpath(__file__)))
     options, args = parser.parse_args()
 
     # Store the script location in a runtime constant, so it can be used by

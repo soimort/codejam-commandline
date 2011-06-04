@@ -1,4 +1,25 @@
 -------------------------------------------------------------------------------
+GCJ Command Line v1.0-beta4, released 2011-06-03
+
+[Feature]: Source files specified in the configuration files and using the -a
+           option in gcj_submit_solution.py can now be glob patterns.
+
+[Feature]: In the tools/ directory there is an update_hashbangs.py script to
+           change the hashbang line of a bulk of python files using a single
+           command.
+
+[Fix]: --base_dir option was not working in gcj_submit_solution.py.
+
+[Fix]: Default value for --base_dir was not following symlinks properly.
+
+[Fix]: User status script was crashing when the user is not logged in or did
+       not participate in the contest.
+
+[Fix]: Configuration file reading was crashing when spaces were inserted before
+       the opening brace. A fix was made to clean the configuration file before
+       attempting to parse it.
+
+-------------------------------------------------------------------------------
 GCJ Command Line v1.0-beta3, released 2011-05-12
 
 [Feature]: New script to get the current user status from the server, showing
