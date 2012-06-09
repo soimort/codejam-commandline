@@ -92,8 +92,7 @@ class InputDownloader(object):
       raise error.ServerError(
           'No response received from the server. This generally happens when:\n'
           '  - You try to download a small input but it is already solved.\n'
-          '  - You try to download the large input before solving the small '
-          'input.\n'
+          '  - You try to download an input before solving the previous ones.\n'
           '  - You try to redownload the large but its timer already '
           'expired.\n')
 

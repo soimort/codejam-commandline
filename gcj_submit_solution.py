@@ -128,7 +128,6 @@ def main():
       current_config = data_manager.ReadData()
       host = current_config['host']
       user = current_config['user']
-      input_spec = current_config['input_spec']
     except KeyError as e:
       raise error.ConfigurationError(
           'Cannot find all required user data in the configuration files: {0}. '
@@ -146,11 +145,24 @@ def main():
           'Cannot find all required contest data in configuration files: {0}. '
           'Reinitializing the contest might solve this error.\n'.format(e))
 
-    # Check that the input type is valid.
-    input_type = args[1].lower()
-    if input_type not in input_spec:
-      raise error.OptionError('invalid input type {0}, must be one of '
-                              '({1})'.format(input_type, ','.join(input_spec)))
+    # Calculate the problem index and check if it is inside the range.
+    problem_index = ord(problem_letter) - ord('A')
+    if problem_index < 0 or problem_index >= len(problems):
+      raise error.UserError(
+          'Cannot find problem {0}; there are only {1} problem(s).\n'.format(
+              problem_letter, len(problems)))
+
+    # Get the problem specification and the targeted I/O set from it.
+    problem = problems[problem_index]
+    io_set_name = args[1].lower()
+    io_set = utils.GetProblemIoSetByName(problem, io_set_name)
+    if io_set is None:
+      raise error.UserError(
+          'Input type {0} not found for problem {1}, available types are: '
+          '{2}.\n'.format(io_set_name, problem['name'],
+                          ', '.join(io_set['name']
+                                    for io_set in problem['io_sets'])))
+    input_id = io_set['input_id']
 
     # Get the needed middleware tokens to submit solutions and check for running
     # attempts.
@@ -162,21 +174,6 @@ def main():
       raise error.ConfigurationError(
           'Cannot find {0} token in configuration file. Reinitializing the '
           'contest might solve this error.\n'.format(e))
-
-    # Calculate the problem index and check if it is inside the range.
-    problem_index = ord(problem_letter) - ord('A')
-    if problem_index < 0 or problem_index >= len(problems):
-      raise error.UserError('Cannot find problem {0}, there are only {1} '
-                            'problem(s).\n'.format(problem_letter,
-                                                   len(problems)))
-
-    # Get the problem specification and the input id from the configuration.
-    problem = problems[problem_index]
-    try:
-      input_id = input_spec[input_type]['input_id']
-    except KeyError:
-      raise error.ConfigurationError('Input specification for "{1}" has no '
-                                     'input_id.\n'.format(input_type))
 
     # Get the data directory from the options, if not defined, get it from the
     # configuration, using './source' as the default value if not found. In the
@@ -200,7 +197,7 @@ def main():
     # Generate the output file name using the specified format and then return.
     try:
       output_basename = output_name_format.format(
-        problem=problem_letter, input=input_type, id=id)
+        problem=problem_letter, input=io_set_name, id=id)
       output_filename = os.path.normpath(os.path.join(data_directory,
                                                       output_basename))
     except KeyError as e:
@@ -218,7 +215,7 @@ def main():
           # Generate the source file name using the specified format and append
           # it to the source list.
           def_source_basename = source_name_format.format(
-              problem=problem_letter, input=input_type, id=id)
+              problem=problem_letter, input=io_set_name, id=id)
           def_source_filename = os.path.normpath(os.path.join(
               data_directory, def_source_basename))
           source_names.append(def_source_filename)
@@ -232,13 +229,14 @@ def main():
     if options.extra_sources is not None:
       for extra_source_format in options.extra_sources:
         extra_source_file = extra_source_format.format(problem=problem_letter,
-                                                       input=input_type, id=id)
+                                                       input=io_set_name, id=id)
         source_names.append(os.path.normpath(extra_source_file))
 
     # Print message indicating that an output is going to be submitted.
     print '-' * 79
     print '{0} output for "{1} - {2}" at "{3}"'.format(
-      input_type.capitalize(), problem_letter, problem['name'], output_filename)
+      io_set['difficulty_name'].capitalize(), problem_letter, problem['name'],
+      output_filename)
     print '-' * 79
 
     # Renew the cookie if the user requested a new login or the cookie has
@@ -257,28 +255,27 @@ def main():
                             'active or in practice mode.\n')
 
     # All problem inputs have public answers in practice mode.
-    input_public = (input_spec[input_type]['public'] or
-                    contest_status == contest_manager.PRACTICE)
+    io_set_public = (io_set['public'] or
+                     contest_status == contest_manager.PRACTICE)
 
     # Get the user status and check if it is participating or not.
-    input_index = utils.GetIndexFromInputId(input_spec, input_id)
     current_user_status = user_status.GetUserStatus(
-        host, cookie, user_status_token, contest_id, input_spec)
+        host, cookie, user_status_token, contest_id, problems)
     if (contest_status == contest_manager.ACTIVE and
         current_user_status is not None):
       # Check that there is a running timer for this problem input.
       problem_inputs = current_user_status.problem_inputs
-      problem_input_state = problem_inputs[problem_index][input_index]
+      problem_input_state = problem_inputs[problem_index][input_id]
       if not options.force and problem_input_state.current_attempt == -1:
         raise error.UserError(
             'You cannot submit {0}-{1}, the timer expired or you did not '
-            'download this input.\n'.format(problem_letter, input_type))
+            'download this input.\n'.format(problem_letter, io_set_name))
 
       # Ask for confirmation if user is trying to resubmit a non-public output.
-      if not input_public and problem_input_state.submitted:
+      if not io_set_public and problem_input_state.submitted:
         submit_message = ('You already have submitted an output for {0}-{1}. '
                           'Resubmitting will override the previous one.'.format(
-                              problem_letter, input_type))
+                              problem_letter, io_set_name))
         utils.AskConfirmationOrDie(submit_message, 'Submit', options.force)
         print 'Submitting new output and source files.'
       else:
@@ -293,14 +290,14 @@ def main():
       submit_message = ('You did not include source code files for this '
                         'attempt. Submitting output files without source code '
                         'can lead to disqualification.'.format(
-                            problem_letter, input_type))
+                            problem_letter, io_set_name))
       utils.AskConfirmationOrDie(submit_message, 'Are you sure', False)
       print 'Submitting without source files.'
 
     # Create the output submitter and send the files.
     submitter = output_submitter.OutputSubmitter(
-      host, cookie, submit_output_token, contest_id, problem['id'])
-    submitter.Submit(input_id, output_filename, source_names, input_public,
+        host, cookie, submit_output_token, contest_id, problem['id'])
+    submitter.Submit(input_id, output_filename, source_names, io_set_public,
       gzip_body=options.gzip_content, zip_sources=options.zip_sources,
       add_ignored_zips=not options.ignore_zip)
 

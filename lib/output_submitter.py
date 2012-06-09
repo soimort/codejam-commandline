@@ -96,13 +96,13 @@ class OutputSubmitter(object):
     # Return all generated sets.
     return source_files, ignored_zips
 
-  def _ParseResult(self, response_data, input_public):
+  def _ParseResult(self, response_data, io_set_public):
     """Extract the result from the server response data.
 
     Args:
       response_data: The response body obtained from the server, which is
         formatted like a python dictionary.
-      input_public: Boolean indicating whether the answer is public or not.
+      io_set_public: Boolean indicating whether the answer is public or not.
 
     Returns:
       The returned message from the server, or the string 'No message found' if
@@ -117,7 +117,7 @@ class OutputSubmitter(object):
       msg = result.get('msg', 'No message found')
       if not result.get('hasAnswer', False):
         return 'Rejected: ' + msg
-      elif not input_public:
+      elif not io_set_public:
         return 'Submitted: ' + msg
       elif result.get('ok', False):
         return 'Correct: ' + msg
@@ -128,7 +128,7 @@ class OutputSubmitter(object):
                               'cannot submit solution. Check that the host, '
                               'user and contest id are valid: {0}.\n'.format(e))
 
-  def Submit(self, input_id, output_name, source_patterns, input_public,
+  def Submit(self, input_id, output_name, source_patterns, io_set_public,
              gzip_body=True, zip_sources=False, add_ignored_zips=False):
     """Submit the specified output and sources file to the problem.
 
@@ -138,7 +138,7 @@ class OutputSubmitter(object):
       output_name: Name of the file with the output data.
       source_patterns: Name patterns of the source files to be included with the
         output. These patterns will be expanded using Python's glob module.
-      input_public: Boolean indicating whether the answer is public or not.
+      io_set_public: Boolean indicating whether the answer is public or not.
       gzip_body: Boolean indicating whether the body has to be gzipped or not.
       zip_sources: Boolean indicating whether all sources should be put inside a
         zip file or not.
@@ -277,7 +277,7 @@ class OutputSubmitter(object):
     # Check if the server accepted the input or just ignored it. If it
     # accepted it, parse the response and print the submission result.
     if response:
-      submit_result = self._ParseResult(response, input_public)
+      submit_result = self._ParseResult(response, io_set_public)
       sys.stdout.write('{0}\n'.format(submit_result))
     else:
       raise error.ServerError(

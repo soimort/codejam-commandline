@@ -98,24 +98,37 @@ def FormatHumanTime(seconds):
   return ', '.join(tokens)
 
 
-def GetIndexFromInputId(input_spec, input_id):
-  """Get the 0-based index of the input_id inside input_spec.
+def GetProblemIndexFromKey(problems, problem_key):
+  """Get a problem's index given its key and a problem list.
 
   Args:
-    input_spec: Dictionary with the input specification, mapping from input name
-        to another dictionary with a 'time_limit' key.
-    input_id: Id whose index must be retrieved.
+    problems: Iterable of problems in the current contest.
+    problem_key: String with the problem key that must be searched.
 
   Returns:
-    0-based index of the input_id inside input_spec.
+    The index of the requested problem in the problem list. If the problem is
+    not found this method returns None.
   """
-  # The index computation does not check if the input_id exists, so make a
-  # separate check for it.
-  if not any(input_data['input_id'] == input_id
-             for _, input_data in input_spec.iteritems()):
-    return None
+  # Look at all the problems and return position of the first problem whose
+  # key matches the looked key.
+  for i, problem in enumerate(problems):
+    if problem['key'] == problem_key:
+      return i
+  return None
 
-  # The index of input_id is equivalent to the number of ids lower than it.
-  return sum(1
-             for _, input_data in input_spec.iteritems()
-             if input_data['input_id'] < input_id)
+
+def GetProblemIoSetByName(problem, io_set_name):
+  """Get a problem's index given its key and a problem list.
+
+  Args:
+    problem: Problem whose I/O set must be retrieved.
+    io_set_name: String with the name of the I/O set to retrieve.
+
+  Returns:
+    The problem I/O set with the specified name, or None if no I/O set with that
+    name is found.
+  """
+  io_set_index = problem['io_set_name_to_index'].get(io_set_name)
+  if io_set_index is None:
+    return None
+  return problem['io_sets'][io_set_index]

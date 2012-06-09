@@ -19,6 +19,7 @@
 
 
 
+import itertools
 import optparse
 import os
 import sys
@@ -114,7 +115,6 @@ def main():
       cookie = current_config['cookie']
       contest_id = current_config['contest_id']
       problems = current_config['problems']
-      input_spec = current_config['input_spec']
     except KeyError as e:
       raise error.ConfigurationError(
           'Cannot find field {0} in the configuration files. Please fill the '
@@ -137,20 +137,21 @@ def main():
       cookie = code_jam_login.Login(options.password)
 
     # Get user's status and check if he/she is participating.
-    status = user_status.GetUserStatus(
-        host, cookie, user_status_token, contest_id, input_spec)
+    status = user_status.GetUserStatus(host, cookie, user_status_token,
+                                       contest_id, problems)
     if status is not None:
       # Get user's submissions and use them to fix the user's status.
-      submissions = user_submissions.GetUserSubmissions(
-          host, cookie, contest_id, problems, input_spec)
-      user_status.FixStatusWithSubmissions(status, submissions, input_spec)
+      submissions = user_submissions.GetUserSubmissions(host, cookie,
+                                                        contest_id, problems)
+      user_status.FixStatusWithSubmissions(status, submissions)
 
       # Show each problem input status to the user.
       print '-' * 79
       print 'User status at contest {0}'.format(contest_id)
       print '-' * 79
       print 'Rank: {0} ({1} points)'.format(status.rank, status.points)
-      for problem, problem_status in zip(problems, status.problem_inputs):
+      for problem, problem_status in itertools.izip(problems,
+                                                    status.problem_inputs):
         print 'Problem: {0}'.format(problem['name'])
         for input_status in problem_status:
           print '  {0}'.format(FormatProblemInputStatus(input_status))

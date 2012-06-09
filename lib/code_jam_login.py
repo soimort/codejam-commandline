@@ -37,6 +37,18 @@ from lib import google_login
 from lib import http_interface
 
 
+def AskForPassword(user):
+  """Ask the user for his or her password.
+
+  Args:
+    user: Name of the user whose password must be retrieved.
+
+  Returns:
+    A password entered by the user.
+  """
+  return getpass.getpass('Password for {0}: '.format(user))
+
+
 def _GetUserPassword(user, contest_data):
   """Get the user password from a possible input string, a value inside the
   configuration file or directly from the user.
@@ -56,17 +68,17 @@ def _GetUserPassword(user, contest_data):
   # No password was specified in the command line or the configuration file,
   # read it from the user.
   print 'Cannot find password for user {0}.'.format(user)
-  return getpass.getpass()
+  return AskForPassword(user)
 
 
-def _MakeLogin(host, user, password):
+def MakeLogin(host, user, password=None):
   """Retrieve the authentication token and cookie from the code jam server,
   using the given user and password to authenticate.
 
   Args:
     host: Name of the host that runs the competition.
     user: User to authenticate in the Code Jam servers.
-    password: Password of the user.
+    password: Password of the user. If None it will be read from the user.
 
   Returns:
     A tuple with the authentication token and the login cookie.
@@ -78,9 +90,13 @@ def _MakeLogin(host, user, password):
       server.
   """
   try:
+    # Ask the user for the password if it wasn't provided.
+    if password is None:
+      sys.stdout.write('Logging into "{0}" with user "{1}"...\n'.format(
+          host, user))
+      password = AskForPassword(user)
+
     # Get the authentication token and gae cookie using the GoogleLogin module.
-    sys.stdout.write('Logging into "{0}" with user "{1}"...\n'.format(
-        host, user))
     application_name = 'gcj_commandline-{0}'.format(constants.VERSION)
     auth_token, cookie = google_login.Login(
         host, 'HOSTED_OR_GOOGLE', user, password, 'ah', application_name, False)
@@ -122,6 +138,8 @@ def _MakeLogin(host, user, password):
                                                               explanation))
 
 
+# TODO(user): Update the commandline tool to adapt to the fact that we only
+# need one middleware token now.  This should be a simplification.
 def _GetMiddlewareTokens(host, cookie):
   """Get needed middleware tokens for the specified host.
 
@@ -224,7 +242,7 @@ def Login(password=None):
 
   # Log in into Google servers using ClientLogin and show the cookie expiration
   # date in localtime.
-  cookie = _MakeLogin(host, user, password)[1]
+  _, cookie = MakeLogin(host, user, password)
   cookie_expiration_time = google_login.GetCookieExpirationTime(cookie)
   if cookie_expiration_time is not None:
     sys.stdout.write('Login cookie will expire at {0}.\n'.format(

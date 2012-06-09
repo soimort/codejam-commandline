@@ -20,6 +20,7 @@ given its id."""
 
 
 
+import collections
 import httplib
 import json
 import os
@@ -34,6 +35,68 @@ from lib import error
 from lib import http_interface
 
 PLANNED, ACTIVE, QUIET, FINISHED, PRACTICE = range(0, 5)
+
+_IO_DIFFICULTY_SPEC = [{'name': 'small',
+                        'time_limit': 4 * 60,
+                        'public': True},
+                       {'name': 'large',
+                        'time_limit': 8 * 60,
+                        'public': False},
+                       ]
+
+
+def _GetProblemIoSets(io_sets, io_difficulty_specs, base_index):
+  """Get all problem I/O sets with necessary names and ids.
+
+  Args:
+    io_sets: Sequence of integers with different I/O sets for a problem. Each
+      integer is the difficulty of one I/O set, which must be a valid index for
+      io_difficulty_specs.
+    io_difficulty_specs: List of dictionaries with the specification for each
+      I/O difficulty. Each one of these dictionaries must have a name for the
+      difficulty, the time limit and a boolean indicating whether the result is
+      public or not.
+    base_index: Global index of the first I/O set of this problem among all I/O
+      sets in the contest.
+
+  Returns:
+    A dictionary from I/O set name to a I/O specification, which is a dictionary
+    with the I/O set name (e.g., small, large, small1, small2, etc.), the input
+    id within the problem, the time limit and whether it's public or not.
+  """
+  # Count how many I/O sets for each difficulty does this problem have. This is
+  # used later to not add indices to I/O difficulties that only appear once (so
+  # a single small is called "small" instead of "small0").
+  total_count_by_difficulty = collections.defaultdict(int)
+  for io_difficulty in io_sets:
+    total_count_by_difficulty[io_difficulty] += 1
+
+  next_difficulty_index = collections.defaultdict(lambda: 1)
+  problem_io_sets = []
+  for input_id, io_difficulty in enumerate(io_sets):
+    # Get an index for this I/O set and update.
+    io_set_difficulty_index = next_difficulty_index[io_difficulty]
+    next_difficulty_index[io_difficulty] += 1
+
+    # If there is only one I/O of this difficulty do not add an index to it.
+    # Otherwise append a number to it so it can be differentiated from others
+    # I/O sets of the same type.
+    io_difficulty_name = io_difficulty_specs[io_difficulty]['name']
+    if total_count_by_difficulty[io_difficulty] == 1:
+      io_set_name = io_difficulty_name
+    else:
+      io_set_name = '{name}{index}'.format(name=io_difficulty_name,
+                                           index=io_set_difficulty_index)
+
+    # Create a copy of the specification for the I/O set, put the new name,
+    # difficulty name and input id and store it into the result.
+    io_set = dict(io_difficulty_specs[io_difficulty])
+    io_set['name'] = io_set_name
+    io_set['difficulty_name'] = io_difficulty_name
+    io_set['global_index'] = base_index + input_id
+    io_set['input_id'] = input_id
+    problem_io_sets.append(io_set)
+  return problem_io_sets
 
 
 def _GetProblems(host, cookie, contest_id):
@@ -86,10 +149,18 @@ def _GetProblems(host, cookie, contest_id):
   try:
     problems = []
     json_response = json.loads(response)
+    base_index = 0
     for problem in json_response:
+      io_sets = _GetProblemIoSets(problem['io_sets'], _IO_DIFFICULTY_SPEC,
+                                  base_index)
+      io_set_name_to_index = dict((io_set['name'], index)
+                                  for index, io_set in enumerate(io_sets))
       problems.append({'key': problem['key'],
                        'id': problem['id'],
-                       'name': problem['name']})
+                       'name': problem['name'],
+                       'io_sets': io_sets,
+                       'io_set_name_to_index': io_set_name_to_index})
+      base_index += len(io_sets)
     return problems
   except (KeyError, ValueError) as e:
     raise error.ServerError('Invalid response received from the server, cannot '

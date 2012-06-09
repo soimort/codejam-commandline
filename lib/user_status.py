@@ -20,16 +20,13 @@
 
 
 import httplib
+import itertools
 import json
 import sys
 import time
 
 from lib import error
 from lib import http_interface
-
-
-def _ClusterByGroups(data, group_size):
-  return zip(*[iter(data)] * group_size)
 
 
 class ProblemInputStatus(object):
@@ -72,14 +69,54 @@ class UserStatus(object):
     self.problem_inputs = problem_inputs
 
   @staticmethod
-  def FromJsonResponse(json_response, input_spec):
+  def _ConstructProblemInputStatus(problems, io_set_status):
+    """Create ProblemInputStatus objects for all problems' I/O sets.
+
+    Args:
+      problems: List with all problems in the contest.
+      io_set_status: A list of (solved, wrong_tries, current_passed, submitted)
+          tuples with all I/O sets' statuses, where:
+
+        solved is the time when the I/O set was solved, or -1 to indicate that
+            the I/O set has not been solved yet.
+        wrong_tries is the number of bad attempts for that I/O set.
+        current_passed is the time elapsed for the currently downloaded input,
+            or -1 if no input is active.
+        submitted is a boolean indicating if the a solution has been submitted
+            for this I/O set or not.
+
+    Returns:
+      A list of lists of ProblemInputStatus objects for each I/O set in all
+          problems. The position [p][i] contains the status for the I/O set i of
+          problem p.
+    """
+    problem_inputs = []
+    for problem in problems:
+      inputs = []
+      for io_set in problem['io_sets']:
+        # Get information for the current I/O set.
+        status = io_set_status[io_set['global_index']]
+        solved, wrong_tries, current_passed, submitted = status
+
+        # Calculate the remaining time for the current attempt using the time
+        # limit in the io_set.
+        time_limit = io_set['time_limit']
+        time_left = -1 if current_passed == -1 else time_limit - current_passed
+
+        # Save the I/O set status for this problem input.
+        inputs.append(ProblemInputStatus(io_set['name'], solved, wrong_tries,
+                                         time_left, submitted))
+      problem_inputs.append(inputs)
+    return problem_inputs
+
+  @staticmethod
+  def FromJsonResponse(json_response, problems):
     """Construct an UserStatus object using a server json_response.
 
     Args:
       json_response: JSON response returned by the server when asked for the
           current user status.
-      input_spec: List of (input_name, time_limit) tuples, each one specifying
-          the type of inputs per problem.
+      problems: List with all problems in the contest.
 
     Returns:
       An UserStatus object with the information contained in the json_response,
@@ -102,34 +139,36 @@ class UserStatus(object):
       json_solved_time = json_response['s']
       json_current = json_response['p']
       json_submitted = json_response['submitted']
-      plain_problem_inputs = []
-      for index, (attempts, solved, current_passed, submitted) in enumerate(zip(
-          json_attempts, json_solved_time, json_current, json_submitted)):
-        # Remove the correct submission and the current attempt from the wrong
-        # tries, if any.
-        wrong_tries = attempts
-        if solved != -1: wrong_tries -= 1
-        if current_passed != -1: wrong_tries -= 1
-
-        # Get the input type and time left for this input, then create a problem
-        # input status object for it.
-        input_type, total_time = input_spec[index % len(input_spec)]
-        time_left = -1 if current_passed == -1 else total_time - current_passed
-        plain_problem_inputs.append(ProblemInputStatus(
-            input_type, solved, wrong_tries, time_left, bool(submitted)))
-
-      # Extract the user status and clusterize the problem inputs. Then return
-      # an user status object with the extracted information.
-      points = json_response['pts']
-      problem_inputs = _ClusterByGroups(plain_problem_inputs, len(input_spec))
-      return UserStatus(rank, points, problem_inputs)
+      json_points = json_response['pts']
 
     except KeyError as e:
       raise error.ServerError('Cannot find needed key in server status '
                               'response: {0}.\n'.format(e))
 
+    # Get a list of with all I/O sets' status, see _ConstructProblemInputStatus
+    # for more details.
+    io_set_status = []
+    for index, (attempts, solved, current_passed, submitted) in enumerate(
+        itertools.izip(json_attempts, json_solved_time, json_current,
+                       json_submitted)):
+      # Remove the correct submission and the current attempt from the wrong
+      # tries, if any.
+      wrong_tries = attempts
+      if solved != -1: wrong_tries -= 1
+      if current_passed != -1: wrong_tries -= 1
 
-def GetUserStatus(host, cookie, middleware_token, contest_id, input_spec):
+      # Store a tuple for this I/O set, which is used when constructing the
+      # final UserStatus.
+      io_set_status.append((solved, wrong_tries, current_passed,
+                            bool(submitted)))
+
+    # Return an user status object with the extracted information.
+    problem_inputs = UserStatus._ConstructProblemInputStatus(problems,
+                                                             io_set_status)
+    return UserStatus(rank, json_points, problem_inputs)
+
+
+def GetUserStatus(host, cookie, middleware_token, contest_id, problems):
   """Get the current user's status from the server.
 
   Args:
@@ -137,15 +176,12 @@ def GetUserStatus(host, cookie, middleware_token, contest_id, input_spec):
     cookie: Cookie for the current user.
     middleware_token: Middleware authentication token for the current user.
     contest_id: Id of the contest where the user is participating.
-    input_spec: Dictionary with the input specification, mapping from input name
-        to another dictionary with a 'time_limit' key.
+    problems: List with all problems in the contest.
 
   Returns:
     An UserStatus object with the current user's status.
 
   Raises:
-    error.ConfigurationError: If there is an input specification without time
-      limit.
     error.NetworkError: If a network error occurs while communicating with the
       server.
     error.ServerError: If the server answers code distinct than 200 or the
@@ -180,55 +216,38 @@ def GetUserStatus(host, cookie, middleware_token, contest_id, input_spec):
                             'get user status. Check that the host, username '
                             'and contest id are valid.\n')
 
-  # Sort and extract information from the input specification.
-  try:
-    parsed_input_spec = [
-        (input_data['input_id'], input_name, input_data['time_limit'])
-        for input_name, input_data in input_spec.iteritems()]
-    parsed_input_spec.sort()
-    input_spec = [input_data[1:] for input_data in parsed_input_spec]
-  except KeyError:
-    raise error.ConfigurationError('Wrong input specification, "time_limit" '
-                                   'key not found.\n')
-
   # Parse the JSON response and return an object with the user status.
   try:
     json_response = json.loads(response)
-    return UserStatus.FromJsonResponse(json_response, input_spec)
+    return UserStatus.FromJsonResponse(json_response, problems)
   except ValueError as e:
     raise error.ServerError('Invalid response received from the server, cannot '
                             'get user status. Check that the contest id is '
                             'valid: {0}.\n'.format(e))
 
 
-def _GetInputStatusForSubmission(status, submission, input_spec):
+def _GetInputStatusForSubmission(status, submission):
   """Return the problem input status for a submission.
 
   Args:
     status: user_status.UserStatus object with the current user status.
     submission: user_submission.UserSubmission object whose problem input status
       must be retrieved.
-    input_spec: Dictionary with the input specification, mapping from input name
-        to another dictionary with a 'input_id' key.
 
   Returns:
     An user_status.ProblemInputStatus object with the problem input status
     corresponding to the submission.
   """
-  # Get the input status from all problem inputs using the problem index
-  # and the input id in the submission.
-  input_index = int(input_spec[submission.input_name]['input_id'])
-  return status.problem_inputs[submission.problem][input_index]
+  return status.problem_inputs[submission.problem][submission.input_id]
 
 
-def FixStatusWithSubmissions(status, submissions, input_spec):
+def FixStatusWithSubmissions(status, submissions):
   """Calculate problem input statuses from user submissions.
 
   Args:
     status: user_status.UserStatus to modify.
     submissions: Sequence of user_submissions.UserSubmission objects with the
       user submissions. If None, an empty list will be used.
-    input_spec: Dictionary with the input specification, keyed by input name.
   """
   # The submissions array might be None, in this case substitute it with an
   # empty list.
@@ -248,7 +267,7 @@ def FixStatusWithSubmissions(status, submissions, input_spec):
   for submission in submissions:
     # Get the corresponding input status and update submission flag. Then update
     # solved time if this submission is correct.
-    input_status = _GetInputStatusForSubmission(status, submission, input_spec)
+    input_status = _GetInputStatusForSubmission(status, submission)
     input_status.submitted = True
     if submission.correct:
       if (input_status.solved_time == -1 or
@@ -260,7 +279,7 @@ def FixStatusWithSubmissions(status, submissions, input_spec):
   for submission in submissions:
     # Get the corresponding input status and count it as wrong if it is wrong
     # and was submitted before the problem input was submitted correctly.
-    input_status = _GetInputStatusForSubmission(status, submission, input_spec)
+    input_status = _GetInputStatusForSubmission(status, submission)
     if submission.wrong:
       if (input_status.solved_time == -1 or
           submission.timestamp <= input_status.solved_time):

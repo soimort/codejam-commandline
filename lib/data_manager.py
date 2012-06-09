@@ -28,15 +28,7 @@ from lib import error
 
 _INPUT_NAME_REGEXP = re.compile(r'^[a-z0-9_]+$')
 
-_DEFAULT_DATA = {
-    'input_spec': {'small': {'input_id': '0',
-                             'time_limit': 4 * 60,
-                             'public': True},
-                   'large': {'input_id': '1',
-                             'time_limit': 8 * 60,
-                             'public': False},
-                   }
-    }
+_DEFAULT_DATA = {}
 
 
 def _PrepareFileData(file_lines):
@@ -131,17 +123,6 @@ def _ValidateData(data):
     raise error.ConfigurationError('Remember to set your username in the user '
                                    'configuration file "{0}".\n'.format(
                                        user_config_path))
-
-  # All input type names should not contain only lowercase letters and digits.
-  if 'input_spec' not in data:
-    raise error.ConfigurationError('Input specification was not found in data '
-                                   'files.\n')
-  for input_name in data['input_spec']:
-    if not _INPUT_NAME_REGEXP.match(input_name):
-      raise error.ConfigurationError('Input name "{0}" in input specification '
-                                     'is invalid, it should contain only '
-                                     'lowercase letters and digits.\n'.format(
-                                         input_name))
 
 
 def ParametrizeConfigPath(config_path):

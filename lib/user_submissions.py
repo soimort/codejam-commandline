@@ -26,6 +26,7 @@ import time
 
 from lib import error
 from lib import http_interface
+from lib import utils
 
 
 class UserSubmission(object):
@@ -46,20 +47,20 @@ class UserSubmission(object):
                                'Correct (+4 minutes)'])
   _TIME_UNITS_TO_SECONDS = {'h': 3600, 'm': 60, 's': 1}
 
-  def __init__(self, key, problem, input_name, status, timestamp):
+  def __init__(self, key, problem, input_id, status, timestamp):
     """Constructor.
 
     Args:
       key: String with the submission key.
       problem: 0-based index of the submission's problem.
-      input_name: Name of the submission's input type (small/large).
+      input_id: Integer with the input id of the submission.
       status: String with the submission's status (Correct, Incorrect, etc.).
       timestamp: Number of seconds that have passed since the contest started
           when the submission was made.
     """
     self.key = key
     self.problem = problem
-    self.input_name = input_name
+    self.input_id = input_id
     self.status = status
     self.correct = UserSubmission._GetCorrectnessFromStatus(self.status)
     self.wrong = UserSubmission._GetWrongnessFromStatus(self.status)
@@ -92,47 +93,6 @@ class UserSubmission(object):
     return status in UserSubmission._WRONG_STATUSES
 
   @staticmethod
-  def _GetProblemIndexFromKey(problems, problem_key):
-    """Get a problem's index given its key and a problem list.
-
-    Args:
-      problems: Iterable of problems in the current contest.
-      problem_key: String with the problem key that must be searched.
-
-    Returns:
-      The index of the requested problem in the problem list. If the problem is
-      not found this method returns None.
-    """
-    # Look at all the problems and return position of the first problem whose
-    # key matches the looked key.
-    for i, problem in enumerate(problems):
-      if problem['key'] == problem_key:
-        return i
-    return None
-
-  @staticmethod
-  def _GetInputNameFromId(input_spec, input_id):
-    """Get an input type name given its id.
-
-    Args:
-      input_spec: Dictionary with the input specification, mapping from input
-          name to another dictionary with an 'input_id' key.
-      input_id: Input id of the input type being searched.
-
-    Returns:
-      The name of the input type whose input id is input_id. If no input type
-      exists with that input_id, None is returned.
-    """
-    # Input ids are stored as string, cast it so comparisons are done
-    # successfully. Then look for it in all input types and return the name of
-    # the one whose id matched the looked one.
-    input_id = str(input_id)
-    for input_name, input_data in input_spec.iteritems():
-      if input_data['input_id'] == input_id:
-        return input_name
-    return None
-
-  @staticmethod
   def _ConvertTimestampToSeconds(timestamp):
     """Convert a timestamp from a readable format into a number of seconds.
 
@@ -153,14 +113,12 @@ class UserSubmission(object):
     return seconds
 
   @staticmethod
-  def FromJsonResponse(json_response, problems, input_spec):
+  def FromJsonResponse(json_response, problems):
     """Convert a JSON response with a submission into a more usable format.
 
     Args:
       json_response: JSON response recevied from the server that must be parsed.
       problems: Iterable with all problems in the current contest.
-      input_spec: Dictionary with the input specification, mapping from input
-          name to another dictionary with an 'input_id' key.
 
     Returns:
       An UserSubmission object with the parsed json_response.
@@ -180,15 +138,13 @@ class UserSubmission(object):
                               'submission.\n'.format(e))
 
     # Parse information into a more usable format and return an user submission.
-    problem_index = UserSubmission._GetProblemIndexFromKey(problems,
-                                                           problem_key)
-    input_name = UserSubmission._GetInputNameFromId(input_spec, input_id)
+    problem_index = utils.GetProblemIndexFromKey(problems, problem_key)
     parsed_timestamp = UserSubmission._ConvertTimestampToSeconds(timestamp)
-    return UserSubmission(submission_key, problem_index, input_name, status,
+    return UserSubmission(submission_key, problem_index, input_id, status,
                           parsed_timestamp)
 
 
-def GetUserSubmissions(host, cookie, contest_id, problems, input_spec):
+def GetUserSubmissions(host, cookie, contest_id, problems):
   """Get the current user's submissions for the current contest.
 
   Args:
@@ -196,8 +152,6 @@ def GetUserSubmissions(host, cookie, contest_id, problems, input_spec):
     cookie: Cookie for the current user.
     contest_id: Id of the contest where the user is participating.
     problems: Iterable with all problems in the current contest.
-    input_spec: Dictionary with the input specification, mapping from input name
-        to another dictionary with an 'input_id' key.
 
   Returns:
     A list of UserSubmission objects with the user submissions for the current
@@ -249,5 +203,5 @@ def GetUserSubmissions(host, cookie, contest_id, problems, input_spec):
                             '{0}.\n'.format(e))
 
   # Process each user submission and return them in a list.
-  return [UserSubmission.FromJsonResponse(submission, problems, input_spec)
+  return [UserSubmission.FromJsonResponse(submission, problems)
           for submission in submissions]

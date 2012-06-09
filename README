@@ -114,9 +114,13 @@ not entered it in the user configuration file.
 2c. Downloading an input
 
 Once you have implemented a solution and think you got it right, you may
-download an input using the gcj_download_input.py script. This script receives
-the problem letter (A, B or C for the GCJ10 Qual), the input type (small or
-large) and an id to differentiate it from other attempts.
+download an input file using the gcj_download_input.py script. This script
+receives the problem letter (A, B or C for the GCJ10 Qual), the I/O set name and
+an id to differentiate it from other attempts.
+
+If a problem has only one small I/O set it will be called "small", but if it has
+multiple small I/O sets they will be called "small1", "small2", "small3", and so
+on (all quotes for clarity). Large I/O sets are named in the same way.
 
 For example, to download a small input for the problem A, Snapper Chain, you
 can execute:
@@ -126,23 +130,20 @@ $ ./gcj_download_input.py A small 0
 which will download the input file and store it in source/A-small-0.in. Now
 it is time to run your solution and generate the output file.
 
-NOTE: This script downloads an input file for the specified problem and starts
-its timer without asking for confirmation. You should double-check the
-parameters before running it or you might start a timer for another problem.
-
 NOTE: Downloading an input file twice in the same attempt will just redownload
 the same input file if its timer has *NOT* expired. Otherwise, it will download
-another input and start another attempt for small inputs.
+another input and start another attempt for small I/O sets. However, if this is
+the case it will ask for confirmation from the user.
 
 
 2d. Submitting a solution
 
 After running your solution and generating the output, it is time to submit the
 output file with the source files using the gcj_submit_solution.py script. This
-script receives the problem letter, the input type and the id used when the
-input was downloaded.
+script receives the problem letter, the I/O set name and the id used when the
+input was downloaded. See section 2c for I/O set naming.
 
-For example, to submit the solution for the small input of problem A, Snapper
+For example, to submit the solution for the small I/O set of problem A, Snapper
 Chain, you can execute:
 
 $ ./gcj_submit_solution.py A small 0

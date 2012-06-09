@@ -101,19 +101,11 @@ def main():
       current_config = data_manager.ReadData()
       host = current_config['host']
       user = current_config['user']
-      input_spec = current_config['input_spec']
     except KeyError as e:
       raise error.ConfigurationError(
           'Cannot find all required user data in the configuration files: {0}. '
           'Please fill the missing fields in the user configuration '
           'file.\n'.format(e))
-
-    # Check that the input type is valid.
-    input_type = args[1].lower()
-    if input_type not in input_spec:
-      raise error.OptionError(
-          'invalid input type {0}, must be one of ({1})'.format(
-              input_type, ','.join(input_spec)))
 
     # Read current contest information from the config file.
     try:
@@ -126,17 +118,6 @@ def main():
           'Cannot find all required contest data in configuration files: {0}. '
           'Reinitializing the contest might solve this error.\n'.format(e))
 
-    # Get the needed middleware tokens to request the file and check for running
-    # attempts.
-    try:
-      get_initial_values_token = middleware_tokens['GetInitialValues']
-      download_input_token = middleware_tokens['GetInputFile']
-      user_status_token = middleware_tokens['GetUserStatus']
-    except KeyError as e:
-      raise error.ConfigurationError(
-          'Cannot find {0} token in configuration file. Reinitializing the '
-          'contest might solve this error.\n'.format(e))
-
     # Calculate the problem index and check if it is inside the range.
     problem_index = ord(problem_letter) - ord('A')
     if problem_index < 0 or problem_index >= len(problems):
@@ -144,13 +125,28 @@ def main():
           'Cannot find problem {0}, there are only {1} problem(s).\n'.format(
               problem_letter, len(problems)))
 
-    # Get the problem specification and the input id from the configuration.
+    # Get the problem specification and the targeted I/O set from it.
     problem = problems[problem_index]
+    io_set_name = args[1].lower()
+    io_set = utils.GetProblemIoSetByName(problem, io_set_name)
+    if io_set is None:
+      raise error.UserError(
+          'Input type {0} not found for problem {1}, available types are: '
+          '{2}.\n'.format(io_set_name, problem['name'],
+                          ', '.join(io_set['name']
+                                    for io_set in problem['io_sets'])))
+    input_id = io_set['input_id']
+
+    # Get the needed middleware tokens to request the file and check for running
+    # attempts.
     try:
-      input_id = input_spec[input_type]['input_id']
-    except KeyError:
+      get_initial_values_token = middleware_tokens['GetInitialValues']
+      user_status_token = middleware_tokens['GetUserStatus']
+      download_input_token = middleware_tokens['GetInputFile']
+    except KeyError as e:
       raise error.ConfigurationError(
-          'Input specification for "{1}" has no input_id.\n'.format(input_type))
+          'Cannot find {0} token in configuration file. Reinitializing the '
+          'contest might solve this error.\n'.format(e))
 
     # Get the data directory from the options, if not defined, get it from the
     # configuration, using './source' as the default value if not found. In the
@@ -164,7 +160,7 @@ def main():
     # Generate the input file name using the specified format and then return.
     try:
       input_basename = input_name_format.format(
-          problem=problem_letter, input=input_type, id=id)
+          problem=problem_letter, input=io_set_name, id=id)
       input_filename = os.path.normpath(os.path.join(data_directory,
                                                      input_basename))
     except KeyError as e:
@@ -176,7 +172,7 @@ def main():
     # Print message indicating that an input is going to be downloaded.
     print '-' * 79
     print '{0} input for "{1} - {2}" at "{3}"'.format(
-        input_type.capitalize(), problem_letter, problem['name'],
+        io_set['difficulty_name'].capitalize(), problem_letter, problem['name'],
         input_filename)
     print '-' * 79
 
@@ -196,24 +192,23 @@ def main():
                             'active or in practice mode.\n')
 
     # Get the user status and check if it is participating or not.
-    input_index = utils.GetIndexFromInputId(input_spec, input_id)
     current_user_status = user_status.GetUserStatus(
-        host, cookie, user_status_token, contest_id, input_spec)
+        host, cookie, user_status_token, contest_id, problems)
     if (contest_status == contest_manager.ACTIVE and
         current_user_status is not None):
       # Check if this problem input can be downloaded or not. An input can be
       # downloaded as long as it has not been solved yet; a non-public input
       # also cannot have wrong tries.
       problem_inputs = current_user_status.problem_inputs
-      problem_input_state = problem_inputs[problem_index][input_index]
-      input_public = input_spec[input_type]['public']
+      problem_input_state = problem_inputs[problem_index][input_id]
+      input_public = io_set['public']
       can_download = problem_input_state.solved_time == -1
       if not input_public:
         can_download = can_download and problem_input_state.wrong_tries == 0
       if not options.force and not can_download:
         raise error.UserError(
             'You cannot download {0}-{1}, it is already {2}.\n'.format(
-                problem_letter, input_type,
+                problem_letter, io_set_name,
                 'solved' if input_public else ('submitted and the timer '
                                                'expired')))
 
@@ -223,18 +218,19 @@ def main():
       if problem_input_state.current_attempt == -1:
         # Show a warning message to the user indicating that a new input is
         # being downloaded, including the time available to solve it.
-        remaining_time = input_spec[input_type]['time_limit']
+        remaining_time = io_set['time_limit']
         download_message = ('You will have {0} to submit your answer for '
-                            '{1}-{2}.'.format(utils.FormatHumanTime(
-                                remaining_time), problem_letter, input_type))
+                            '{1}-{2}.'.format(
+                                utils.FormatHumanTime(remaining_time),
+                                problem_letter, io_set_name))
         utils.AskConfirmationOrDie(download_message, 'Download', options.force)
         print 'Downloading new input file.'
       else:
         # Show a message to the user indicating that the same input file is
         # being downloaded, including the time left to solve it.
         remaining_time = problem_input_state.current_attempt
-        print ('You still have {0} to submit your answer for {1}-{2}.'.format(
-            utils.FormatHumanTime(remaining_time), problem_letter, input_type))
+        print 'You still have {0} to submit your answer for {1}-{2}.'.format(
+            utils.FormatHumanTime(remaining_time), problem_letter, io_set_name)
         print 'Redownloading previous input file.'
     else:
       print 'Downloading practice input file.'
