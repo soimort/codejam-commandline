@@ -1,4 +1,14 @@
 -------------------------------------------------------------------------------
+GCJ Command Line v1.1-beta1, released 2012-06-08
+
+Previous versions of the commandline tool still work, but will not be able to
+handle problems with I/O sets different than small/large.
+
+[Feature]: Support for arbitrary number of I/O sets for each problem. This
+           includes support for problems with no small I/O sets, no large I/O
+           sets and multiple I/O sets of the same type.
+
+-------------------------------------------------------------------------------
 GCJ Command Line v1.0-beta4, released 2011-06-03
 
 [Feature]: Source files specified in the configuration files and using the -a
