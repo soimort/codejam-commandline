@@ -1,8 +1,19 @@
 -------------------------------------------------------------------------------
+GCJ Command Line v1.2-beta1, released 2012-07-26
+
+WARNING: Previous versions of the commandline tool don't work anymore, because
+the problem information returned by the server changed its format.
+
+[Feature]: Check that the current version is accepted by the host.
+
+[Fix]: Modify tool to receive all problem and I/O set information from the
+       server, keeping support for arbitrary I/O sets.
+
+-------------------------------------------------------------------------------
 GCJ Command Line v1.1-beta1, released 2012-06-08
 
 Previous versions of the commandline tool still work, but will not be able to
-handle problems with I/O sets different than small/large.
+handle problems with I/O sets different from small/large.
 
 [Feature]: Support for arbitrary number of I/O sets for each problem. This
            includes support for problems with no small I/O sets, no large I/O

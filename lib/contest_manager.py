@@ -36,22 +36,24 @@ from lib import http_interface
 
 PLANNED, ACTIVE, QUIET, FINISHED, PRACTICE = range(0, 5)
 
-_IO_DIFFICULTY_SPEC = [{'name': 'small',
-                        'time_limit': 4 * 60,
-                        'public': True},
-                       {'name': 'large',
-                        'time_limit': 8 * 60,
-                        'public': False},
-                       ]
+_IO_DIFFICULTY_SPEC = {
+    0: {'difficulty_name': 'small',
+        'difficulty': 0,
+        'time_limit': 4 * 60,
+        'public': True},
+    1: {'difficulty_name': 'large',
+        'difficulty': 1,
+        'time_limit': 8 * 60,
+        'public': False},
+    }
 
 
 def _GetProblemIoSets(io_sets, io_difficulty_specs, base_index):
   """Get all problem I/O sets with necessary names and ids.
 
   Args:
-    io_sets: Sequence of integers with different I/O sets for a problem. Each
-      integer is the difficulty of one I/O set, which must be a valid index for
-      io_difficulty_specs.
+    io_sets: Sequence of dictionaries with different I/O sets for a problem.
+      Each dictionary has the name, id, difficulty and points for each I/O set.
     io_difficulty_specs: List of dictionaries with the specification for each
       I/O difficulty. Each one of these dictionaries must have a name for the
       difficulty, the time limit and a boolean indicating whether the result is
@@ -61,41 +63,22 @@ def _GetProblemIoSets(io_sets, io_difficulty_specs, base_index):
 
   Returns:
     A dictionary from I/O set name to a I/O specification, which is a dictionary
-    with the I/O set name (e.g., small, large, small1, small2, etc.), the input
-    id within the problem, the time limit and whether it's public or not.
+    with the I/O name, the input id within the problem, the points, the time
+    limit and whether it's public or not.
   """
-  # Count how many I/O sets for each difficulty does this problem have. This is
-  # used later to not add indices to I/O difficulties that only appear once (so
-  # a single small is called "small" instead of "small0").
-  total_count_by_difficulty = collections.defaultdict(int)
-  for io_difficulty in io_sets:
-    total_count_by_difficulty[io_difficulty] += 1
-
-  next_difficulty_index = collections.defaultdict(lambda: 1)
   problem_io_sets = []
-  for input_id, io_difficulty in enumerate(io_sets):
-    # Get an index for this I/O set and update.
-    io_set_difficulty_index = next_difficulty_index[io_difficulty]
-    next_difficulty_index[io_difficulty] += 1
+  for input_io_set in io_sets:
+    io_difficulty = input_io_set['difficulty']
+    input_id = input_io_set['number']
 
-    # If there is only one I/O of this difficulty do not add an index to it.
-    # Otherwise append a number to it so it can be differentiated from others
-    # I/O sets of the same type.
-    io_difficulty_name = io_difficulty_specs[io_difficulty]['name']
-    if total_count_by_difficulty[io_difficulty] == 1:
-      io_set_name = io_difficulty_name
-    else:
-      io_set_name = '{name}{index}'.format(name=io_difficulty_name,
-                                           index=io_set_difficulty_index)
-
-    # Create a copy of the specification for the I/O set, put the new name,
-    # difficulty name and input id and store it into the result.
-    io_set = dict(io_difficulty_specs[io_difficulty])
-    io_set['name'] = io_set_name
-    io_set['difficulty_name'] = io_difficulty_name
-    io_set['global_index'] = base_index + input_id
-    io_set['input_id'] = input_id
-    problem_io_sets.append(io_set)
+    # Make a copy of the difficulty data and patch it with the information from
+    # the I/O set.
+    output_io_set = dict(io_difficulty_specs[io_difficulty])
+    output_io_set['name'] = input_io_set['name']
+    output_io_set['points'] = input_io_set['points']
+    output_io_set['input_id'] = input_id
+    output_io_set['global_index'] = base_index + input_id
+    problem_io_sets.append(output_io_set)
   return problem_io_sets
 
 

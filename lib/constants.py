@@ -19,7 +19,7 @@
 
 
 
-VERSION = 'v1.0-beta3'
+VERSION = 'v1.2-beta1'
 CODEJAM_AGENT_NAME = 'cmdline-%s' % VERSION
 USER_CONFIG_PATH = '{base_dir}/config/user_config.py'
 CURRENT_CONFIG_PATH = '{base_dir}/config/current_config.py'

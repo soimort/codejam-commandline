@@ -37,6 +37,64 @@ from lib import google_login
 from lib import http_interface
 
 
+def CheckToolVersion(host, tool_version):
+  """Check if the specified tool_version is accepted by the host.
+
+  Args:
+    host: Host where the contest is running.
+    tool_version: String with this tool's version.
+
+  Raises:
+    error.InternalError: If the tool's version is not accepted by the host.
+    error.NetworkError: If a network error occurs while communicating with the
+      server.
+    error.ServerError: If the server answers code distinct than 200 or the
+      response is a malformed JSON.
+  """
+  # Send an HTTP request to get the problem list from the server.
+  sys.stdout.write('Checking tool version for "{0}"...\n'.format(host))
+  request_referer = 'http://{0}/codejam'.format(host)
+  request_arguments = {
+      'cmd': 'CheckVersion',
+      'version': tool_version,
+      }
+  request_headers = {
+      'Referer': request_referer,
+      }
+  try:
+    status, reason, response = http_interface.Get(
+        host, '/codejam/cmdline', request_arguments, request_headers)
+  except httplib.HTTPException as e:
+    raise error.NetworkError('HTTP exception while checking tool version with '
+                             'the Google Code Jam server: {0}\n'.format(e))
+
+  # The current server version might not support this yet. Print a warning
+  # message and skip validation.
+  if status == 404:
+    print 'WARNING: Cannot check commandline version with the server.'
+    return
+
+  # Check if the status is not good.
+  if status != 200 or reason != 'OK':
+    raise error.ServerError('Error while communicating with the server, cannot '
+                            'check tool version. Check that the host is '
+                            'valid.\n')
+
+  # Extract token information from server response.
+  try:
+    validation_info = json.loads(response)
+    if validation_info['msg']:
+      print validation_info['msg']
+    if not validation_info['valid']:
+      raise error.InternalError('This tool\'s version is not accepted by host '
+                                '{0}, please update to the latest '
+                                'version.\n'.format(host, tool_version))
+  except (KeyError, ValueError) as e:
+    raise error.ServerError('Invalid response received from the server, cannot '
+                            'initialize contest. Check that the contest id is '
+                            'valid: {0}.\n'.format(e))
+
+
 def AskForPassword(user):
   """Ask the user for his or her password.
 
@@ -139,7 +197,7 @@ def MakeLogin(host, user, password=None):
 
 
 # TODO(user): Update the commandline tool to adapt to the fact that we only
-# need one middleware token now.  This should be a simplification.
+# need one middleware token now. This should be a simplification.
 def _GetMiddlewareTokens(host, cookie):
   """Get needed middleware tokens for the specified host.
 
@@ -235,6 +293,9 @@ def Login(password=None):
   except KeyError as e:
     raise error.ConfigurationError('No host or username was found in the user '
                                    'configuration file: {0}.\n'.format(e))
+
+  # Before doing anything, check that this tool version is valid.
+  CheckToolVersion(host, constants.VERSION)
 
   # Retrieve the password from elsewhere, as the user didn't provide one.
   if password is None:
